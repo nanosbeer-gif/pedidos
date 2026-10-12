@@ -72,6 +72,7 @@ h2{font-family:var(--display);font-weight:400;font-size:21px;color:var(--gold);m
 .qrs figure{margin:0;text-align:center}
 .qrs img{width:100%;border-radius:12px;border:1px solid var(--line);aspect-ratio:2/3;background:var(--panel)}
 .qrs figcaption{font-weight:800;margin-top:6px}
+.lnk{display:block;margin-top:8px;color:var(--neon);text-decoration:none}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:10px}
 .kpis div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;font-weight:700;color:var(--muted);font-size:13px}
 .kpis span{display:block;font-family:var(--display);font-size:34px;color:var(--neon);font-variant-numeric:tabular-nums}
@@ -313,7 +314,7 @@ function qrView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
   return `<div class="crumb"><button class="sec" data-home>← Eventos</button><div><b>QR · ${esc(e.nombre)}</b></div></div>
     <p class="hint">Mantén presionada la imagen y elige <b>Guardar imagen</b> para imprimirla.${e.barras>1?" Cada barra tiene su propio QR: ponlo solo cerca de esa barra.":""}</p>
-    <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}" alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?"Barra "+(k+1):"QR del evento"}</figcaption></figure>`).join("")}</div>`;
+    <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}" alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?"Barra "+(k+1):"QR del evento"}</figcaption><a class="sec lnk" href="${BASE}?e=${e.id}${e.barras>1?"&b="+(k+1):""}" target="_blank" rel="noopener">Abrir como invitado</a></figure>`).join("")}</div>`;
 }
 function resumenView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
