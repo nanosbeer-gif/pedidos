@@ -98,9 +98,16 @@ textarea.t{min-height:60px;resize:vertical}
 @media (prefers-reduced-motion:reduce){.ready{animation:none}}
 .steps{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .steps li{font-size:11.5px;font-weight:800;color:var(--muted);padding-top:10px;border-top:4px solid var(--line)}
-.steps li.ok{border-color:var(--pink);color:var(--fg)}
+.steps li.pas{border-color:var(--pink);color:var(--fg)}
 .steps li.now{border-color:var(--neon);color:var(--neon)}
 .mini{margin-top:16px;color:var(--muted);font-size:13.5px;line-height:1.6}
+.mrow{all:unset;cursor:pointer;box-sizing:border-box;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--panel2);border:1.5px solid var(--line);border-radius:14px;padding:10px 12px}
+.mrow:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+.mnum{font-family:var(--display);font-size:26px;color:var(--neon);font-variant-numeric:tabular-nums}
+.mtxt{min-width:0}.mtxt b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mtxt small{color:var(--muted);font-size:12px}
+.pill{font-size:12px;font-weight:800;border-radius:999px;padding:4px 10px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.pill.preparando{color:var(--gold)}.pill.lista{background:var(--neon);color:#1a0b3a}.pill.entregado{opacity:.6}
+#mine{margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -116,6 +123,7 @@ textarea.t{min-height:60px;resize:vertical}
       <button id="m-domicilio" aria-pressed="false">🛵 A domicilio</button>
     </div>
     <p class="note" id="modeNote"></p>
+    <section id="mine" hidden></section>
     <nav class="chips" id="chips" aria-label="Categorías"></nav>
     <main id="menu"></main>
   </div>
@@ -160,7 +168,7 @@ const ITEMS = [
   {id:"mojitofr",cat:"mojitos",name:"Mojito frutos rojos",price:60,color:"#ff6b8a,#7a1036",desc:"Fresa, blueberry y frambuesa trituradas, sirope, Sprite, limón y azúcar. Escarchado con chilito.",groups:[{name:"Hierba",opts:["Menta","Hierbabuena"]},{name:"Escarchado",opts:["Con chilito","Sin chilito"]}]}
 ];
 
-let mode = "evento", cat = "todas", cart = [], unsub = null, lastEstado = "", audioCtx = null;
+let mode = "evento", cat = "todas", cart = [], audioCtx = null, pendingBeep = false;
 const $ = s => document.querySelector(s);
 const money = n => "$" + n.toLocaleString("es-MX");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -200,6 +208,7 @@ function openSheet(html){ $("#sheet").innerHTML = html; $("#sheetBg").hidden = f
 function closeSheet(){ $("#sheetBg").hidden = true; }
 
 function openItem(id){
+  if(mode==="evento"){ const a = activeEvento(); if(a) return lockSheet(a); }
   const i = ITEMS.find(x=>x.id===id);
   const g = i.groups.map((gr,gi)=>`<div class="grp"><b>${gr.name}</b><div class="opts">${
     gr.opts.map((o,oi)=>`<label class="opt"><input type="radio" name="g${gi}" id="g${gi}o${oi}" value="${esc(o)}" ${oi===0?"checked":""}><span>${o}</span></label>`).join("")}</div></div>`).join("");
@@ -209,15 +218,16 @@ function openItem(id){
       <label class="opt"><input type="radio" name="size" id="s2" value="1"><span>1 litro${mode==="domicilio"?" · "+money(i.price+EXTRA_LITRO):""}</span></label>
     </div></div>${g}
     <label class="f" for="itemNote">¿Algo más? (opcional)<textarea class="t" id="itemNote" maxlength="120" placeholder="Ej. poco hielo, sin limón"></textarea></label>
-    <div class="qty"><button data-q="-1" aria-label="Menos">−</button><output id="q">1</output><button data-q="1" aria-label="Más">+</button></div>
-    <div style="margin-top:18px"><button class="primary" data-add="${i.id}">Agregar al pedido</button></div>`);
+    ${mode==="domicilio"?`<div class="qty"><button data-q="-1" aria-label="Menos">−</button><output id="q">1</output><button data-q="1" aria-label="Más">+</button></div>`:""}
+    <div style="margin-top:18px"><button class="primary" data-add="${i.id}">${mode==="evento"?"Pedir esta bebida":"Agregar al pedido"}</button></div>`);
 }
 function addItem(id){
   const i = ITEMS.find(x=>x.id===id);
   const big = document.querySelector('input[name="size"]:checked')?.value==="1";
   const choices = i.groups.map((gr,gi)=>gr.name+": "+document.querySelector(`input[name="g${gi}"]:checked`).value);
-  cart.push({name:i.name,size:big?"1 L":"½ L",unit:i.price+(big?EXTRA_LITRO:0),qty:Math.min(10,+$("#q").textContent),choices,note:$("#itemNote").value.trim()});
-  closeSheet(); renderCart();
+  const line = {name:i.name,size:big?"1 L":"½ L",unit:i.price+(big?EXTRA_LITRO:0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};
+  if(mode==="evento"){ cart = [line]; renderCart(); openCart(); return; }
+  cart.push(line); closeSheet(); renderCart();
 }
 function openCart(){
   const rows = cart.map((l,k)=>`<div class="row"><div><b>${l.qty}× ${l.name} (${l.size})</b>
@@ -255,6 +265,7 @@ function beep(){
 }
 
 async function send(){
+  if(mode==="evento"){ const a = activeEvento(); if(a) return lockSheet(a); }
   const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
   if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
     box.innerHTML = `<p class="err">${mode==="evento"?"Escribe tu nombre para enviar.":"Completa tu nombre, teléfono y dirección para enviar."}</p>`; return;
@@ -262,7 +273,7 @@ async function send(){
   try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); audioCtx.resume(); }catch{}
   btn.disabled = true; btn.textContent = "Enviando…";
   const numero = String(Math.floor(100 + Math.random()*900));
-  const data = {
+  const orden = {
     modo: mode, numero, nombre: v("nombre"),
     tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
@@ -271,10 +282,11 @@ async function send(){
     estado: "nuevo", creado: serverTimestamp()
   };
   try{
-    const ref = await addDoc(collection(db,"pedidos"), data);
-    store.set("nf_nombre", data.nombre);
-    store.set("nf_pedido", ref.id);
-    cart = []; closeSheet(); watchOrder(ref.id);
+    const ref = await addDoc(collection(db,"pedidos"), orden);
+    store.set("nf_nombre", orden.nombre);
+    mine.unshift({id:ref.id, t:Date.now()}); mine = mine.slice(0,10); saveMine();
+    data[ref.id] = {id:ref.id, ...orden, creado:null};
+    cart = []; showStatus(ref.id);
   }catch(e){
     btn.disabled = false; btn.textContent = "Enviar pedido";
     box.innerHTML = `<p class="err">No se pudo enviar. Revisa tu señal y vuelve a intentar.</p>`;
@@ -285,38 +297,92 @@ const PASOS = {
   evento:   [["nuevo","Recibido"],["preparando","Preparando"],["lista","¡Lista!"],["entregado","Entregada"]],
   domicilio:[["nuevo","Recibido"],["preparando","Preparando"],["lista","En camino"],["entregado","Entregado"]]
 };
-function watchOrder(id){
-  unsub && unsub();
-  $("#menuWrap").hidden = true; $("#status").hidden = false; renderCart();
-  $("#status").innerHTML = `<div class="st"><p class="note">Cargando tu pedido…</p></div>`;
-  unsub = onSnapshot(doc(db,"pedidos",id), snap=>{
-    if(!snap.exists()){ store.del("nf_pedido"); newOrder(); return; }
-    const p = snap.data(), pasos = PASOS[p.modo]||PASOS.evento, idx = Math.max(0, pasos.findIndex(x=>x[0]===p.estado));
-    if(p.estado==="lista" && lastEstado && lastEstado!=="lista") beep();
-    lastEstado = p.estado;
-    const big = p.estado==="lista"
-      ? (p.modo==="evento" ? `<div class="ready">¡Tu bebida está lista! 🥤<span>Pasa a la barra y di tu número</span></div>` : `<div class="ready">¡Tu pedido va en camino! 🛵<span>Ten listo tu pago</span></div>`)
-      : p.estado==="entregado" ? `<div class="ready done">¡Disfrútala! 💜</div>`
-      : `<p class="wait">${p.estado==="preparando"?"Estamos preparando tu bebida…":"Recibimos tu pedido. Estás en la fila."}<br><small>No cierres esta pantalla: aquí te avisamos.</small></p>`;
-    $("#status").innerHTML = `<div class="st">
-      <p class="lbl">Tu número</p><div class="num">#${esc(p.numero)}</div><p class="who">${esc(p.nombre)}</p>
-      ${big}
-      <ol class="steps">${pasos.map((s,k)=>`<li class="${k<idx?"ok":k===idx?"now":""}">${s[1]}</li>`).join("")}</ol>
-      <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)} (${esc(it.tam)})</div>`).join("")}</div>
-      ${p.estado==="entregado"?`<button class="primary" id="newBtn">Pedir otra bebida</button>`:`<button class="ghost" id="newBtn">Hacer otro pedido</button>`}
-    </div>`;
-  }, ()=>{ $("#status").innerHTML = `<div class="st"><p class="err">Se perdió la conexión. Revisa tu señal; esta pantalla se actualiza sola.</p><button class="ghost" id="newBtn">Volver al menú</button></div>`; });
-}
-function newOrder(){
-  unsub && unsub(); unsub = null; lastEstado = "";
+const ESTADO_TXT = {nuevo:"En fila", preparando:"Preparando", lista:"¡Lista!", entregado:"Entregada"};
+const VIDA = 14*3600*1000; // los pedidos se guardan en el celular 14 horas
+
+// ===== Mis pedidos (se guardan en este celular) =====
+let mine = [], data = {}, watchers = {}, viewing = null, autoOpen = null;
+function loadMine(){
+  try{ mine = JSON.parse(store.get("nf_mis") || "[]"); }catch{ mine = []; }
+  const old = store.get("nf_pedido"); // pedido de la versión anterior
+  if(old && !mine.some(m=>m.id===old)) mine.unshift({id:old, t:Date.now()});
   store.del("nf_pedido");
+  mine = mine.filter(m=>Date.now()-m.t < VIDA).slice(0,10);
+  saveMine();
+}
+function saveMine(){ store.set("nf_mis", JSON.stringify(mine.map(m=>({id:m.id,t:m.t})))); }
+function activeEvento(){ return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.estado!=="entregado"); }
+
+function track(id){
+  if(watchers[id]) return;
+  watchers[id] = onSnapshot(doc(db,"pedidos",id), snap=>{
+    if(!snap.exists()){
+      watchers[id](); delete watchers[id]; delete data[id];
+      mine = mine.filter(m=>m.id!==id); saveMine();
+      if(viewing===id) backToMenu();
+      renderMine(); return;
+    }
+    const prev = data[id], p = {id, ...snap.data()};
+    data[id] = p;
+    if(prev && prev.estado!=="lista" && p.estado==="lista"){ beep(); if(document.visibilityState!=="visible") pendingBeep = true; }
+    if(p.estado==="entregado"){ watchers[id](); delete watchers[id]; }
+    if(viewing===id) renderStatus(p);
+    else if(autoOpen===id && viewing===null && p.estado!=="entregado") showStatus(id);
+    if(autoOpen===id) autoOpen = null;
+    renderMine();
+  }, ()=>{ delete watchers[id]; if(viewing===id) $("#status").innerHTML = `<div class="st"><p class="err">Se perdió la conexión. Revisa tu señal y vuelve a abrir la página.</p><button class="ghost" id="backBtn">Volver al menú</button></div>`; });
+}
+
+function renderMine(){
+  const list = mine.map(m=>data[m.id]).filter(Boolean);
+  const box = $("#mine");
+  if(!list.length){ box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<h2 style="margin-top:4px">Mis pedidos</h2><div class="list">${list.map(p=>`
+    <button class="mrow" data-mine="${p.id}">
+      <span class="mnum">#${esc(p.numero)}</span>
+      <span class="mtxt"><b>${(p.items||[]).map(it=>`${it.cant>1?it.cant+"× ":""}${esc(it.nombre)}`).join(", ")}</b><small>${p.modo==="domicilio"?"A domicilio":"En el evento"}</small></span>
+      <span class="pill ${p.estado}">${p.modo==="domicilio"&&p.estado==="lista"?"En camino":ESTADO_TXT[p.estado]||""}</span>
+    </button>`).join("")}</div>`;
+}
+
+function showStatus(id){
+  viewing = id; closeSheet();
+  $("#menuWrap").hidden = true; $("#status").hidden = false; renderCart(); scrollTo(0,0);
+  if(data[id]) renderStatus(data[id]); else $("#status").innerHTML = `<div class="st"><p class="note">Cargando tu pedido…</p></div>`;
+  track(id);
+}
+function renderStatus(p){
+  const pasos = PASOS[p.modo]||PASOS.evento, idx = Math.max(0, pasos.findIndex(x=>x[0]===p.estado));
+  const big = p.estado==="lista"
+    ? (p.modo==="evento" ? `<div class="ready">¡Tu bebida está lista! 🥤<span>Pasa a la barra y di tu número</span></div>` : `<div class="ready">¡Tu pedido va en camino! 🛵<span>Ten listo tu pago</span></div>`)
+    : p.estado==="entregado" ? `<div class="ready done">¡Disfrútala! 💜</div>`
+    : `<p class="wait">${p.estado==="preparando"?"Estamos preparando tu bebida…":"Recibimos tu pedido. Estás en la fila."}<br><small>Deja esta pantalla abierta: aquí te avisamos.</small></p>`;
+  $("#status").innerHTML = `<div class="st">
+    <p class="lbl">Tu número</p><div class="num">#${esc(p.numero)}</div><p class="who">${esc(p.nombre)}</p>
+    ${big}
+    <ol class="steps">${pasos.map((s,k)=>`<li class="${k<idx?"pas":k===idx?"now":""}">${s[1]}</li>`).join("")}</ol>
+    <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)} (${esc(it.tam)})</div>`).join("")}</div>
+    ${p.estado==="entregado"&&p.modo==="evento"?`<button class="primary" id="backBtn">Pedir otra bebida</button>`:`<button class="ghost" id="backBtn">Ver el menú</button>`}
+    ${p.modo==="evento"&&p.estado!=="entregado"?`<p class="note" style="margin-top:12px">Si cierras la página, tu pedido sigue guardado en "Mis pedidos".</p>`:""}
+  </div>`;
+}
+function backToMenu(){
+  viewing = null;
   $("#status").hidden = true; $("#menuWrap").hidden = false; renderCart(); scrollTo(0,0);
+}
+function lockSheet(p){
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Ya tienes una bebida en camino</h3>
+    <p class="desc" style="font-size:14.5px;margin-top:8px">En el evento es una bebida a la vez. Tu pedido <b>#${esc(p.numero)}</b> está <b>${ESTADO_TXT[p.estado]}</b>. Cuando lo recojas en la barra podrás pedir la siguiente.</p>
+    <div style="margin-top:18px"><button class="primary" data-mine="${p.id}">Ver mi pedido</button></div>`);
 }
 
 document.addEventListener("click", e=>{
   if(e.target.id==="sheetBg"){ closeSheet(); return; }
   const t = e.target.closest("button"); if(!t) return;
-  if(t.dataset.c){ cat=t.dataset.c; renderChips(); renderMenu(); }
+  if(t.dataset.mine) showStatus(t.dataset.mine);
+  else if(t.id==="backBtn") backToMenu();
+  else if(t.dataset.c){ cat=t.dataset.c; renderChips(); renderMenu(); }
   else if(t.dataset.i) openItem(t.dataset.i);
   else if(t.dataset.q){ const q=$("#q"); q.textContent=Math.min(10,Math.max(1,+q.textContent+ +t.dataset.q)); }
   else if(t.dataset.add) addItem(t.dataset.add);
@@ -324,16 +390,17 @@ document.addEventListener("click", e=>{
   else if(t.dataset.rm){ cart.splice(+t.dataset.rm,1); cart.length?openCart():(closeSheet(),renderCart()); }
   else if(t.id==="openCart") openCart();
   else if(t.id==="sendBtn") send();
-  else if(t.id==="newBtn") newOrder();
   else if(t.id==="m-evento"||t.id==="m-domicilio"){
     const nm = t.id==="m-evento"?"evento":"domicilio";
     if(nm!==mode){ mode=nm; cart=[]; setModeUI(); renderMenu(); renderCart(); }
   }
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSheet(); });
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible"){ try{ audioCtx && audioCtx.resume().then(()=>{ if(pendingBeep){ pendingBeep=false; beep(); } }); }catch{} } });
 
 setModeUI(); renderChips(); renderMenu(); renderCart();
-const prev = store.get("nf_pedido"); if(prev) watchOrder(prev);
+loadMine(); mine.forEach(m=>track(m.id));
+autoOpen = mine[0]?.id || null;
 
 </script>
 </body>
