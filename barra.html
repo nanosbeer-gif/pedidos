@@ -6,29 +6,46 @@
 <meta name="theme-color" content="#140a2e">
 <meta name="robots" content="noindex">
 <title>Barra Nano's Fizz</title>
+<link rel="icon" href="logo.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
+<script src="qrcode.js"></script>
 <style>
 [hidden]{display:none!important}
-body{margin:0}
-img{max-width:100%}
-
-/* Panel de barra: fila de pedidos por estado, pensado para tablet o celular en la barra */
+/* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
 :root{--bg:#140a2e;--panel:#21124a;--panel2:#2c1a5e;--line:#3f2a7a;--fg:#f3edff;--muted:#b9a9e6;--neon:#7dff3a;--pink:#ff4fb8;--gold:#ffc53d;
 --display:"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;--body:"Nunito",system-ui,-apple-system,sans-serif;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--fg)}
-body{margin:0;font-family:var(--body);font-size:15px;padding-inline:16px;padding-block:0 40px;padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;font-family:var(--body);font-size:15px;padding-inline:16px;padding-block:0 40px;padding-top:env(safe-area-inset-top,0px);transition:background .2s}
+body.flash{animation:fl 1s steps(2) 8}
+@keyframes fl{50%{background:#3b1468}}
+img{max-width:100%}
+.wrap{max-width:1100px;margin:0 auto}
 .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-block:14px 8px}
 .top h1{font-family:var(--display);font-weight:400;font-size:24px;margin:0;color:var(--neon);flex:1;min-width:0}
 .live{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;border:1.5px solid var(--line);color:var(--muted)}
 .live.on{border-color:var(--neon);color:var(--neon)}.live.off{border-color:var(--pink);color:var(--pink)}
-.btn{all:unset;cursor:pointer;font-weight:800;font-size:13px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--line)}
+.btn,.sec{all:unset;cursor:pointer;font-weight:800;font-size:13px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--line);text-align:center}
 .btn[aria-pressed="true"]{border-color:var(--neon);color:var(--neon)}
+.sec.danger{color:var(--pink);border-color:var(--pink)}
+h2{font-family:var(--display);font-weight:400;font-size:21px;color:var(--gold);margin:18px 0 10px}
+.blk{margin-top:8px}
+.evc{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:10px;margin-bottom:10px}
+.evh b{display:block;font-size:18px;overflow-wrap:anywhere}.evh small{color:var(--muted);font-weight:700}
+.evb{display:flex;flex-wrap:wrap;gap:8px}
+.evb>*{flex:1 1 140px}
+.evf{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;gap:12px}
+.evf label{display:grid;gap:5px;font-weight:700;font-size:13px}
+.evf input,.evf select{width:100%;background:var(--bg);border:1.5px solid var(--line);color:var(--fg);border-radius:10px;padding:11px;font:inherit}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.crumb{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-block:6px}
+.crumb>div{min-width:0;font-size:17px}.crumb b{overflow-wrap:anywhere}
+.bdg{font-size:12px;font-weight:800;background:var(--pink);color:#fff;border-radius:6px;padding:2px 8px;margin-left:8px}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:8px;z-index:2}
 .tab{all:unset;cursor:pointer;text-align:center;font-weight:800;font-size:13px;padding:10px 4px;border-radius:12px;background:var(--panel);border:1.5px solid var(--line)}
 .tab span{display:block;font-family:var(--display);font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
 .tab[aria-pressed="true"]{border-color:var(--neon);color:var(--neon)}
-.tab:focus-visible,.btn:focus-visible,.go:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+.tab:focus-visible,.btn:focus-visible,.go:focus-visible,.sec:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
 #list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:8px}
 .ord{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--neon);border-radius:16px;padding:14px;min-width:0}
 .ord.domicilio{border-left-color:var(--gold)}
@@ -44,44 +61,60 @@ body{margin:0;font-family:var(--body);font-size:15px;padding-inline:16px;padding
 .dom{margin-top:10px;font-size:13.5px;line-height:1.6;overflow-wrap:anywhere}
 .sel{user-select:all;font-weight:800}
 .acts{display:flex;gap:8px;margin-top:12px}
-.go{all:unset;cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:16px;padding:13px;border-radius:12px;background:var(--neon);color:#1a0b3a}
-.go.nuevo{background:var(--gold)}.go.lista{background:var(--pink);color:#fff}
+.go{all:unset;cursor:pointer;box-sizing:border-box;text-align:center;font-weight:800;font-size:16px;padding:13px;border-radius:12px;background:var(--neon);color:#1a0b3a}
+.acts .go{flex:1}
+.go.nuevo,.go.dom{background:var(--gold)}.go.lista{background:var(--pink);color:#fff}
 .go[disabled]{opacity:.5}
 .back{all:unset;cursor:pointer;font-weight:700;font-size:13px;padding:13px 10px;color:var(--muted)}
-.empty{color:var(--muted);text-align:center;padding:40px 10px;grid-column:1/-1}
+.empty{color:var(--muted);text-align:center;padding:30px 10px;grid-column:1/-1}
+.hint{color:var(--muted);line-height:1.5}
+.qrs{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.qrs figure{margin:0;text-align:center}
+.qrs img{width:100%;border-radius:12px;border:1px solid var(--line);aspect-ratio:2/3;background:var(--panel)}
+.qrs figcaption{font-weight:800;margin-top:6px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:10px}
+.kpis div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;font-weight:700;color:var(--muted);font-size:13px}
+.kpis span{display:block;font-family:var(--display);font-size:34px;color:var(--neon);font-variant-numeric:tabular-nums}
+.bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.bars div{background:var(--panel);border-radius:12px;padding:10px;font-weight:700}.bars b{display:block;font-size:24px;color:var(--gold)}
+.top{display:grid;gap:6px}
+.top>div{display:flex;justify-content:space-between;gap:10px;background:var(--panel);border-radius:10px;padding:10px 12px;font-weight:700}
+.top b{color:var(--neon);font-variant-numeric:tabular-nums}
 .login{max-width:360px;margin:12vh auto 0;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;text-align:center}
 .login h1{font-family:var(--display);font-weight:400;color:var(--neon);margin:10px 0 4px}
 .login p{color:var(--muted);margin:0 0 16px}
 .login input{width:100%;background:var(--bg);border:1.5px solid var(--line);color:var(--fg);border-radius:10px;padding:12px;font:inherit;margin-bottom:12px}
 .login button{all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;background:var(--neon);color:#1a0b3a;font-weight:800;padding:14px;border-radius:12px}
-.err{color:var(--pink);font-weight:700;font-size:13px;min-height:1em;margin-top:10px}
+.err{color:var(--pink);font-weight:700;font-size:13px;min-height:1em;margin:0}
+@media (prefers-reduced-motion:reduce){body.flash{animation:none}}
 </style>
 </head>
 <body>
+<div class="wrap">
 <section id="login" class="login">
-  <img class="logo" style="width:46px;height:46px" alt="Logo Nano's Fizz" src="logo.png">
+  <img src="logo.png" alt="" style="width:90px;height:90px">
   <h1>Barra Nano's Fizz</h1>
   <p>Entra para ver los pedidos.</p>
   <form id="loginForm">
     <input id="pass" type="password" autocomplete="current-password" placeholder="Contraseña de la barra" required>
     <button id="loginBtn" type="submit">Entrar</button>
-    <div class="err" id="loginErr"></div>
+    <p class="err" id="loginErr"></p>
   </form>
 </section>
 <section id="panel" hidden>
   <div class="top">
-    <img class="logo" style="width:46px;height:46px" alt="Logo Nano's Fizz" src="logo.png">
-    <h1>Pedidos</h1>
+    <img src="logo.png" alt="" style="width:46px;height:46px">
+    <h1>Barra</h1>
     <span class="live" id="live">Conectando…</span>
     <button class="btn" id="soundBtn" aria-pressed="false">🔕 Activar sonido</button>
     <button class="btn" id="outBtn">Salir</button>
   </div>
-  <nav class="tabs" id="tabs"></nav>
-  <div id="list"></div>
+  <main id="main"></main>
 </section>
+</div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const app = initializeApp({
@@ -94,12 +127,69 @@ const app = initializeApp({
 });
 const db = getFirestore(app), auth = getAuth(app);
 const EMAIL = "barra@nanosfizz.app";
+const BASE = "https://nanosbeer-gif.github.io/pedidos/";
+
+// ===== Timbre fuerte: <audio> con WAV generado (suena aunque el iPhone esté en silencio) =====
+function makeChime(){
+  const sr = 22050, notes = [988, 1319, 1568, 1319, 1568, 2093], dur = 0.22, gap = 0.04, reps = 3, pause = 0.35;
+  const one = notes.length*(dur+gap), total = reps*one + (reps-1)*pause;
+  const n = Math.floor(total*sr), data = new Int16Array(n);
+  for(let r=0;r<reps;r++){
+    const off = r*(one+pause);
+    notes.forEach((f,k)=>{
+      const st = Math.floor((off + k*(dur+gap))*sr), len = Math.floor(dur*sr);
+      for(let i=0;i<len && st+i<n;i++){
+        const t = i/sr, env = Math.min(1, i/200) * Math.exp(-3*t);
+        const v = Math.sin(2*Math.PI*f*t) + 0.5*Math.sin(2*Math.PI*2*f*t) + 0.25*Math.sign(Math.sin(2*Math.PI*f*t));
+        data[st+i] = Math.max(-32767, Math.min(32767, v*env*20000));
+      }
+    });
+  }
+  const buf = new ArrayBuffer(44 + n*2), dv = new DataView(buf);
+  const w = (o,s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,"RIFF"); dv.setUint32(4,36+n*2,true); w(8,"WAVE"); w(12,"fmt "); dv.setUint32(16,16,true);
+  dv.setUint16(20,1,true); dv.setUint16(22,1,true); dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true);
+  dv.setUint16(32,2,true); dv.setUint16(34,16,true); w(36,"data"); dv.setUint32(40,n*2,true);
+  new Int16Array(buf,44).set(data);
+  return URL.createObjectURL(new Blob([buf],{type:"audio/wav"}));
+}
+const chime = new Audio(makeChime()); chime.preload = "auto";
+let chimeReady = false;
+try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch{}
+// Llamar dentro de un toque del usuario para que el navegador permita sonar después
+function unlockSound(){
+  if(chimeReady) return;
+  try{
+    chime.muted = true;
+    const p = chime.play();
+    const done = ()=>{ chime.pause(); chime.currentTime = 0; chime.muted = false; chimeReady = true; };
+    p && p.then ? p.then(done).catch(()=>{ chime.muted = false; }) : done();
+  }catch{}
+}
+function ring(txt){
+  try{ chime.currentTime = 0; chime.muted = false; chime.volume = 1; chime.play().catch(()=>{}); }catch{}
+  try{ navigator.vibrate && navigator.vibrate([400,150,400,150,700]); }catch{}
+  flash(txt);
+}
+let flashTimer = null;
+function flash(txt){
+  clearInterval(flashTimer); let k = 0; const t0 = window.__t0 || (window.__t0 = document.title);
+  document.body.classList.add("flash");
+  flashTimer = setInterval(()=>{
+    document.title = (k++%2) ? t0 : (txt||"🔔 ¡Lista!");
+    if(k>16){ clearInterval(flashTimer); document.title = t0; document.body.classList.remove("flash"); }
+  }, 500);
+}
+
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const money = n => "$" + Number(n||0).toLocaleString("es-MX");
+const store = { get(k){ try{return localStorage.getItem(k)}catch{return null} }, set(k,v){ try{localStorage.setItem(k,v)}catch{} } };
 
-let pedidos = [], tab = "nuevo", unsub = null, known = null, soundOn = false, audioCtx = null, wake = null;
+// Vista actual: {view:"home"} | {view:"cola", evento:id|"domicilio", barra:0|n} | {view:"qr", evento} | {view:"resumen", evento}
+let sel = JSON.parse(store.get("nf_sel") || '{"view":"home"}');
+let eventosLoaded = false, eventos = [], pedidos = [], tab = "nuevo", unsubEv = null, unsubPed = null, known = null, soundOn = false, wake = null, cerrando = null;
 
 const NEXT = {
   nuevo:      {to:"preparando", label:"Preparar"},
@@ -108,75 +198,196 @@ const NEXT = {
 };
 const TABS = [["nuevo","Nuevos"],["preparando","Preparando"],["lista","Listos"],["entregado","Entregados"]];
 
-function ding(){
-  if(!soundOn || !audioCtx) return;
-  try{
-    [0,0.18].forEach((t,k)=>{
-      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-      o.frequency.value = k ? 1320 : 990; o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.3,audioCtx.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+t+0.25);
-      o.start(audioCtx.currentTime+t); o.stop(audioCtx.currentTime+t+0.25);
-    });
-  }catch{}
-}
-async function keepAwake(){ try{ wake = await navigator.wakeLock?.request("screen"); }catch{} }
-document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && soundOn) keepAwake(); });
-
+function go(s){ sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
+function ev(id){ return eventos.find(e=>e.id===id); }
+function fecha(ts){ try{ return ts.toDate().toLocaleDateString("es-MX",{day:"numeric",month:"short"}); }catch{ return "hoy"; } }
 function ago(ts){
   if(!ts) return "ahora";
   const m = Math.floor((Date.now() - ts.toMillis())/60000);
   return m < 1 ? "ahora" : m < 60 ? `hace ${m} min` : `hace ${Math.floor(m/60)} h`;
 }
+async function keepAwake(){ try{ wake = await navigator.wakeLock?.request("screen"); }catch{} }
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && soundOn) keepAwake(); });
 
+// ===== Datos en vivo =====
+function listenEventos(){
+  unsubEv && unsubEv();
+  unsubEv = onSnapshot(query(collection(db,"eventos"), where("estado","==","activo")), snap=>{
+    eventosLoaded = true;
+    eventos = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>(b.creado?.toMillis?.()||0)-(a.creado?.toMillis?.()||0));
+    setLive(true); render();
+  }, ()=>setLive(false));
+}
+function listenPedidos(){
+  unsubPed && unsubPed(); unsubPed = null; pedidos = [];
+  const id = sel.view==="cola" || sel.view==="resumen" ? sel.evento : null;
+  if(!id) return;
+  unsubPed = onSnapshot(query(collection(db,"pedidos"), where("evento","==",id)), snap=>{
+    let list = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    if(id==="domicilio"){ const desde = Date.now()-24*3600*1000; list = list.filter(p=>!p.creado || p.creado.toMillis()>=desde); }
+    list.sort((a,b)=>(a.creado?.toMillis?.()||Date.now())-(b.creado?.toMillis?.()||Date.now()));
+    const mine = list.filter(p=>!sel.barra || p.barra===sel.barra);
+    if(known && sel.view==="cola"){ if(mine.some(p=>!known.has(p.id) && p.estado==="nuevo") && soundOn) ring("🔔 Pedido nuevo"); }
+    known = new Set(mine.map(p=>p.id));
+    pedidos = list; setLive(true); render();
+  }, ()=>setLive(false));
+}
+function setLive(ok){ const l=$("#live"); if(!l) return; l.textContent = ok?"En vivo":"Sin conexión"; l.className = "live "+(ok?"on":"off"); }
+
+// ===== Pantallas =====
 function render(){
-  const counts = Object.fromEntries(TABS.map(([k])=>[k, pedidos.filter(p=>p.estado===k).length]));
-  $("#tabs").innerHTML = TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("");
-  let list = pedidos.filter(p=>p.estado===tab);
-  if(tab==="entregado") list = list.slice().reverse().slice(0,30);
-  $("#list").innerHTML = list.length ? list.map(p=>`
-    <article class="ord ${p.modo}">
-      <header>
-        <div class="n">#${esc(p.numero)}</div>
-        <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio":"🎉 Evento"} · ${ago(p.creado)}</small></div>
-      </header>
-      <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b> <span class="tam">${esc(it.tam)}</span>
-        ${(it.opciones||[]).length?`<div class="op">${it.opciones.map(esc).join(" · ")}</div>`:""}
-        ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
-      ${p.modo==="domicilio"?`<div class="dom">
-        <div>📞 <span class="sel">${esc(p.tel)}</span></div>
-        <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
-        <div>💵 ${esc(p.pago)} · <b>${money(p.total)}</b> + envío</div></div>`:""}
-      ${NEXT[p.estado]?`<div class="acts">
-        <button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
-        ${p.estado!=="nuevo"?`<button class="back" data-id="${p.id}" data-to="${p.estado==="lista"?"preparando":"nuevo"}">Regresar</button>`:""}
-      </div>`:""}
-    </article>`).join("")
-    : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un cliente pida.":"Nada por aquí."}</p>`;
+  const v = sel.view;
+  if(v!=="home" && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
+  const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id]=i.value; });
+  const focused = document.activeElement?.id;
+  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : "";
+  Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(i) i.value=val; });
+  if(focused){ const f=document.getElementById(focused); if(f && f.matches("input,select")) f.focus(); }
+  if(v==="qr") drawQRs();
 }
 
-function listen(){
-  unsub && unsub();
-  const desde = Timestamp.fromMillis(Date.now() - 14*3600*1000);
-  const q = query(collection(db,"pedidos"), where("creado",">=",desde), orderBy("creado","asc"));
-  unsub = onSnapshot(q, snap=>{
-    const ids = new Set(snap.docs.map(d=>d.id));
-    if(known){ const nuevos = snap.docs.filter(d=>!known.has(d.id)); if(nuevos.length) ding(); }
-    known = ids;
-    pedidos = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    $("#live").textContent = "En vivo"; $("#live").className = "live on";
-    render();
-  }, err=>{
-    $("#live").textContent = "Sin conexión"; $("#live").className = "live off";
-    console.error(err);
+function homeView(){
+  const cards = eventos.map(e=>`
+    <article class="evc">
+      <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.barras} ${e.barras>1?"barras":"barra"}</small></div>
+      <div class="evb">
+        ${Array.from({length:e.barras},(_,k)=>`<button class="go" data-cola="${e.id}" data-b="${e.barras>1?k+1:0}">${e.barras>1?"Barra "+(k+1):"Abrir pedidos"}</button>`).join("")}
+        ${e.barras>1?`<button class="sec" data-cola="${e.id}" data-b="0">Todas las barras</button>`:""}
+      </div>
+      <div class="evb">
+        <button class="sec" data-qr="${e.id}">Ver QR</button>
+        <button class="sec" data-res="${e.id}">Resumen</button>
+      </div>
+    </article>`).join("");
+  return `
+    <section class="blk">
+      <h2>Eventos activos</h2>
+      ${cards || `<p class="empty">No hay eventos activos. Crea uno abajo.</p>`}
+    </section>
+    <section class="blk">
+      <h2>Crear evento</h2>
+      <form id="evForm" class="evf">
+        <label for="evNombre">Nombre del evento<input id="evNombre" maxlength="50" required placeholder="Ej. XV años de Ana"></label>
+        <div class="row2">
+          <label for="evPersonas">Personas<input id="evPersonas" type="number" min="1" max="2000" required inputmode="numeric" placeholder="150"></label>
+          <label for="evBarras">Barras<select id="evBarras"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        </div>
+        <button class="go" type="submit" id="evBtn">Crear evento</button>
+        <p class="err" id="evErr"></p>
+      </form>
+    </section>
+    <section class="blk">
+      <h2>Domicilio</h2>
+      <div class="evb"><button class="go dom" data-cola="domicilio" data-b="0">Pedidos a domicilio</button></div>
+    </section>`;
+}
+
+function colaView(){
+  const e = ev(sel.evento), titulo = sel.evento==="domicilio" ? "Domicilio" : (e?.nombre||"Evento");
+  const list0 = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
+  const counts = Object.fromEntries(TABS.map(([k])=>[k, list0.filter(p=>p.estado===k).length]));
+  let list = list0.filter(p=>p.estado===tab);
+  if(tab==="entregado") list = list.slice().reverse().slice(0,40);
+  return `
+    <div class="crumb"><button class="sec" data-home>← Eventos</button>
+      <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">Barra ${sel.barra}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
+    <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
+    <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
+}
+function card(p){
+  return `<article class="ord ${p.modo}">
+    <header><div class="n">#${esc(p.numero)}</div>
+      <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio":(p.barra&&!sel.barra?`Barra ${p.barra} · `:"")}${ago(p.creado)}</small></div></header>
+    <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b> <span class="tam">${esc(it.tam)}</span>
+      ${(it.opciones||[]).length?`<div class="op">${it.opciones.map(esc).join(" · ")}</div>`:""}
+      ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
+    ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
+      <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
+      <div>💵 ${esc(p.pago)} · <b>${money(p.total)}</b> + envío</div></div>`:""}
+    ${NEXT[p.estado]?`<div class="acts"><button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
+      ${p.estado!=="nuevo"?`<button class="back" data-id="${p.id}" data-to="${p.estado==="lista"?"preparando":"nuevo"}">Regresar</button>`:""}</div>`:""}
+  </article>`;
+}
+
+function qrView(){
+  const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
+  return `<div class="crumb"><button class="sec" data-home>← Eventos</button><div><b>QR · ${esc(e.nombre)}</b></div></div>
+    <p class="hint">Mantén presionada la imagen y elige <b>Guardar imagen</b> para imprimirla.${e.barras>1?" Cada barra tiene su propio QR: ponlo solo cerca de esa barra.":""}</p>
+    <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}" alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?"Barra "+(k+1):"QR del evento"}</figcaption></figure>`).join("")}</div>`;
+}
+function resumenView(){
+  const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
+  const beb = pedidos.reduce((a,p)=>a+(p.items||[]).reduce((x,it)=>x+(it.cant||1),0),0);
+  const ent = pedidos.filter(p=>p.estado==="entregado").length;
+  const pend = pedidos.length - ent;
+  const top = {}; pedidos.forEach(p=>(p.items||[]).forEach(it=>top[it.nombre]=(top[it.nombre]||0)+(it.cant||1)));
+  const topList = Object.entries(top).sort((a,b)=>b[1]-a[1]);
+  const porB = Array.from({length:e.barras},(_,k)=>pedidos.filter(p=>p.barra===k+1).length);
+  return `<div class="crumb"><button class="sec" data-home>← Eventos</button><div><b>Resumen · ${esc(e.nombre)}</b></div></div>
+    <div class="kpis">
+      <div><span>${pedidos.length}</span>Pedidos</div>
+      <div><span>${beb}</span>Bebidas</div>
+      <div><span>${e.personas?(beb/e.personas).toFixed(1):"–"}</span>Bebidas por persona</div>
+      <div><span>${pend}</span>Pendientes</div>
+    </div>
+    ${e.barras>1?`<h2>Por barra</h2><div class="bars">${porB.map((n,k)=>`<div>Barra ${k+1}<b>${n}</b></div>`).join("")}</div>`:""}
+    <h2>Más pedidas</h2>
+    <div class="top">${topList.length?topList.map(([n,c])=>`<div><span>${esc(n)}</span><b>${c}</b></div>`).join(""):`<p class="empty">Aún no hay pedidos.</p>`}</div>
+    <div class="blk">
+      ${cerrando===e.id
+        ? `<p class="hint">Al cerrar el evento su QR deja de aceptar pedidos. ${pend?`<b>Quedan ${pend} pedidos sin entregar.</b>`:""}</p>
+           <div class="evb"><button class="go lista" data-cerrar="${e.id}">Sí, cerrar evento</button><button class="sec" data-nocerrar>Cancelar</button></div>`
+        : `<button class="sec danger" data-precerrar="${e.id}">Cerrar evento</button>`}
+    </div>`;
+}
+
+// ===== Tarjeta QR (canvas) =====
+const logoImg = new Image(); logoImg.src = "logo.png";
+function drawQRs(){
+  const e = ev(sel.evento); if(!e || !window.qrcode) return;
+  document.querySelectorAll(".qrc").forEach(cv=>{
+    const b = +cv.dataset.b, url = `${BASE}?e=${e.id}${e.barras>1?"&b="+b:""}`;
+    const draw = ()=>{
+      const c = cv.getContext ? cv.getContext("2d") : null, W=1200, H=1800; if(!c) return;
+      const g = c.createRadialGradient(W/2,0,50,W/2,0,900); g.addColorStop(0,"#3a1d7a"); g.addColorStop(1,"#140a2e");
+      c.fillStyle = g; c.fillRect(0,0,W,H);
+      if(logoImg.complete && logoImg.naturalWidth) c.drawImage(logoImg,(W-260)/2,60,260,260);
+      c.textAlign = "center"; c.fillStyle = "#7dff3a"; c.font = "800 80px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
+      c.fillText("¡Pide tu bebida!", W/2, 410);
+      c.fillStyle = "#f3edff"; c.font = "700 46px Nunito, sans-serif";
+      fitText(c, e.nombre, W/2, 480, 1040);
+      if(e.barras>1){ c.fillStyle = "#ff4fb8"; c.font = "800 44px Nunito, sans-serif"; c.fillText("BARRA "+b, W/2, 545); }
+      const q = qrcode(0,"H"); q.addData(url); q.make();
+      const n = q.getModuleCount(), size = 700, cell = size/n, x0 = (W-size)/2, y0 = 600;
+      c.fillStyle = "#fff"; roundRect(c, x0-36, y0-36, size+72, size+72, 40); c.fill();
+      c.lineWidth = 10; c.strokeStyle = "#ff4fb8"; c.stroke();
+      c.fillStyle = "#140a2e";
+      for(let r=0;r<n;r++) for(let k=0;k<n;k++) if(q.isDark(r,k)) c.fillRect(Math.floor(x0+k*cell), Math.floor(y0+r*cell), Math.ceil(cell), Math.ceil(cell));
+      const lc = 140; c.fillStyle = "#fff"; c.beginPath(); c.arc(W/2, y0+size/2, lc/2+8, 0, 7); c.fill();
+      if(logoImg.complete && logoImg.naturalWidth) c.drawImage(logoImg, W/2-lc/2, y0+size/2-lc/2, lc, lc);
+      c.textAlign = "left"; c.font = "800 42px Nunito, sans-serif";
+      ["Escanea con la cámara de tu cel","Te avisamos cuando esté lista","Pasa a la barra con tu número"].forEach((t,i)=>{
+        const y = 1430 + i*95;
+        c.fillStyle = "#7dff3a"; c.beginPath(); c.arc(185, y-14, 32, 0, 7); c.fill();
+        c.fillStyle = "#140a2e"; c.textAlign = "center"; c.fillText(String(i+1), 185, y);
+        c.fillStyle = "#f3edff"; c.textAlign = "left"; c.fillText(t, 240, y);
+      });
+      const img = document.querySelector(`.qri[data-b="${b}"]`); if(img) img.src = cv.toDataURL("image/png");
+    };
+    document.fonts?.ready ? document.fonts.ready.then(draw) : draw();
+    if(!logoImg.complete) logoImg.onload = ()=>drawQRs();
   });
 }
+function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
+function fitText(c,t,x,y,max){ let s = 46; while(c.measureText(t).width > max && s > 24){ s -= 2; c.font = `700 ${s}px Nunito, sans-serif`; } c.fillText(t,x,y); }
 
+// ===== Acciones =====
 onAuthStateChanged(auth, u=>{
   const ok = u && u.email === EMAIL;
   $("#login").hidden = ok; $("#panel").hidden = !ok;
-  if(ok) listen(); else { unsub && unsub(); unsub = null; known = null; pedidos = []; }
+  if(ok){ listenEventos(); listenPedidos(); render(); }
+  else { unsubEv && unsubEv(); unsubPed && unsubPed(); unsubEv = unsubPed = null; known = null; pedidos = []; eventos = []; }
 });
-
 $("#loginForm").addEventListener("submit", async e=>{
   e.preventDefault();
   const btn = $("#loginBtn"); btn.disabled = true; $("#loginErr").textContent = "";
@@ -184,23 +395,45 @@ $("#loginForm").addEventListener("submit", async e=>{
   catch{ $("#loginErr").textContent = "Contraseña incorrecta. Revisa e intenta de nuevo."; }
   btn.disabled = false;
 });
-
+document.addEventListener("submit", async e=>{
+  if(e.target.id!=="evForm") return;
+  e.preventDefault();
+  const nombre = $("#evNombre").value.trim(), personas = parseInt($("#evPersonas").value,10), barras = parseInt($("#evBarras").value,10);
+  if(!nombre || !(personas>0)){ $("#evErr").textContent = "Pon el nombre y el número de personas."; return; }
+  $("#evBtn").disabled = true;
+  try{
+    const ref = await addDoc(collection(db,"eventos"), {nombre, personas, barras, estado:"activo", creado: serverTimestamp()});
+    if(!ev(ref.id)) eventos.unshift({id:ref.id, nombre, personas, barras, estado:"activo", creado:null});
+    go({view:"qr", evento: ref.id});
+  }catch{ $("#evErr").textContent = "No se pudo crear. Revisa el internet."; $("#evBtn").disabled = false; }
+});
 document.addEventListener("click", async e=>{
   const t = e.target.closest("button"); if(!t) return;
   if(t.dataset.tab){ tab = t.dataset.tab; render(); }
+  else if(t.dataset.cola){ go({view:"cola", evento:t.dataset.cola, barra:+t.dataset.b||0}); }
+  else if(t.dataset.qr){ go({view:"qr", evento:t.dataset.qr}); }
+  else if(t.dataset.res){ cerrando = null; go({view:"resumen", evento:t.dataset.res}); }
+  else if(t.dataset.home!==undefined){ go({view:"home"}); }
+  else if(t.dataset.precerrar){ cerrando = t.dataset.precerrar; render(); }
+  else if(t.dataset.nocerrar!==undefined){ cerrando = null; render(); }
+  else if(t.dataset.cerrar){
+    t.disabled = true;
+    try{ await updateDoc(doc(db,"eventos",t.dataset.cerrar), {estado:"cerrado"}); cerrando = null; go({view:"home"}); }
+    catch{ t.disabled = false; }
+  }
   else if(t.dataset.to){
     t.disabled = true;
     try{ await updateDoc(doc(db,"pedidos",t.dataset.id), {estado:t.dataset.to}); }
-    catch{ t.disabled = false; alert("No se pudo actualizar. Revisa el internet."); }
+    catch{ t.disabled = false; }
   }
   else if(t.id==="soundBtn"){
-    try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); await audioCtx.resume(); }catch{}
+    unlockSound();
     soundOn = !soundOn; t.textContent = soundOn ? "🔔 Sonido activado" : "🔕 Activar sonido"; t.setAttribute("aria-pressed", soundOn);
-    if(soundOn){ ding(); keepAwake(); }
+    if(soundOn){ setTimeout(()=>ring("🔔 Prueba"), 300); keepAwake(); }
   }
   else if(t.id==="outBtn") signOut(auth);
 });
-setInterval(()=>{ if(pedidos.length) render(); }, 60000);
+setInterval(()=>{ if(sel.view==="cola" && pedidos.length) render(); }, 60000);
 
 </script>
 </body>

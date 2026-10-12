@@ -108,6 +108,9 @@ textarea.t{min-height:60px;resize:vertical}
 .pill{font-size:12px;font-weight:800;border-radius:999px;padding:4px 10px;background:var(--bg);color:var(--muted);white-space:nowrap}
 .pill.preparando{color:var(--gold)}.pill.lista{background:var(--neon);color:#1a0b3a}.pill.entregado{opacity:.6}
 #mine{margin-bottom:6px}
+body.flash{animation:fl 1s steps(2) 8}
+@keyframes fl{50%{background:#3b1468}}
+@media (prefers-reduced-motion:reduce){body.flash{animation:none}}
 </style>
 </head>
 <body>
@@ -115,13 +118,9 @@ textarea.t{min-height:60px;resize:vertical}
 <div class="wrap">
   <header>
     <img class="logo" alt="Logo Nano's Fizz" src="logo.png">
-    <div><h1>Nano's Fizz</h1><p class="sub">Pide desde tu cel. Nosotros te avisamos.</p></div>
+    <div><h1>Nano's Fizz</h1><p class="sub" id="evName">Pide desde tu cel. Nosotros te avisamos.</p></div>
   </header>
   <div id="menuWrap">
-    <div class="mode" role="group" aria-label="Tipo de pedido">
-      <button id="m-evento" aria-pressed="true">🎉 Estoy en el evento</button>
-      <button id="m-domicilio" aria-pressed="false">🛵 A domicilio</button>
-    </div>
     <p class="note" id="modeNote"></p>
     <section id="mine" hidden></section>
     <nav class="chips" id="chips" aria-label="Categorías"></nav>
@@ -135,7 +134,7 @@ textarea.t{min-height:60px;resize:vertical}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, getDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDP3ZypMhSahfx-e1KEsSh6rsy4IIJakiU",
@@ -168,21 +167,36 @@ const ITEMS = [
   {id:"mojitofr",cat:"mojitos",name:"Mojito frutos rojos",price:60,color:"#ff6b8a,#7a1036",desc:"Fresa, blueberry y frambuesa trituradas, sirope, Sprite, limón y azúcar. Escarchado con chilito.",groups:[{name:"Hierba",opts:["Menta","Hierbabuena"]},{name:"Escarchado",opts:["Con chilito","Sin chilito"]}]}
 ];
 
-let mode = "evento", cat = "todas", cart = [], audioCtx = null, pendingBeep = false;
+let cat = "todas", cart = [], pendingBeep = false;
+const QS = new URLSearchParams(location.search);
+const E = QS.get("e") || "", BARRA = Math.max(1, Math.min(9, parseInt(QS.get("b")||"1",10)||1));
+let mode = E ? "evento" : "domicilio", evento = null, eventoOk = !E;
 const $ = s => document.querySelector(s);
 const money = n => "$" + n.toLocaleString("es-MX");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const store = { get(k){ try{return localStorage.getItem(k)}catch{return null} }, set(k,v){ try{localStorage.setItem(k,v)}catch{} }, del(k){ try{localStorage.removeItem(k)}catch{} } };
 
 // Modo inicial desde el link: ?modo=domicilio
-if (new URLSearchParams(location.search).get("modo") === "domicilio") mode = "domicilio";
 
 function setModeUI(){
-  $("#m-evento").setAttribute("aria-pressed", mode==="evento");
-  $("#m-domicilio").setAttribute("aria-pressed", mode==="domicilio");
-  $("#modeNote").textContent = mode==="evento"
-    ? "Tus bebidas ya están incluidas en el evento. Pide aquí y te avisamos en esta pantalla cuando esté lista para que pases a la barra."
-    : "Bebidas de medio litro. Agranda a 1 litro por +$30.";
+  if(mode==="evento"){
+    $("#evName").textContent = evento ? evento.nombre : "Cargando evento…";
+    $("#modeNote").textContent = !E ? "" : (evento && evento.estado!=="activo") || (evento===false)
+      ? "Este evento ya terminó y no recibe pedidos. ¡Gracias por venir!"
+      : "Tus bebidas ya están incluidas en el evento. Pide aquí y te avisamos en esta pantalla cuando esté lista para que pases a la barra.";
+  }else{
+    $("#evName").textContent = "Pedidos a domicilio";
+    $("#modeNote").textContent = "Bebidas de medio litro. Agranda a 1 litro por +$30.";
+  }
+}
+async function loadEvento(){
+  if(!E) return;
+  try{
+    const snap = await getDoc(doc(db,"eventos",E));
+    evento = snap.exists() ? {id:snap.id, ...snap.data()} : false;
+  }catch{ evento = false; }
+  eventoOk = !!(evento && evento.estado==="activo");
+  setModeUI(); renderMine();
 }
 function renderChips(){
   const all = [{id:"todas",name:"Todas"}, ...CATS];
@@ -208,6 +222,7 @@ function openSheet(html){ $("#sheet").innerHTML = html; $("#sheetBg").hidden = f
 function closeSheet(){ $("#sheetBg").hidden = true; }
 
 function openItem(id){
+  if(mode==="evento" && !eventoOk) return closedSheet();
   if(mode==="evento"){ const a = activeEvento(); if(a) return lockSheet(a); }
   const i = ITEMS.find(x=>x.id===id);
   const g = i.groups.map((gr,gi)=>`<div class="grp"><b>${gr.name}</b><div class="opts">${
@@ -251,26 +266,66 @@ function openCart(){
     <div style="margin-top:16px"><button class="primary" id="sendBtn">Enviar pedido</button></div>`);
 }
 
-function beep(){
-  try{
-    if(!audioCtx) return;
-    [0,0.25,0.5].forEach(t=>{
-      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-      o.frequency.value=880; o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.25,audioCtx.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+t+0.2);
-      o.start(audioCtx.currentTime+t); o.stop(audioCtx.currentTime+t+0.2);
+// ===== Timbre fuerte: <audio> con WAV generado (suena aunque el iPhone esté en silencio) =====
+function makeChime(){
+  const sr = 22050, notes = [988, 1319, 1568, 1319, 1568, 2093], dur = 0.22, gap = 0.04, reps = 3, pause = 0.35;
+  const one = notes.length*(dur+gap), total = reps*one + (reps-1)*pause;
+  const n = Math.floor(total*sr), data = new Int16Array(n);
+  for(let r=0;r<reps;r++){
+    const off = r*(one+pause);
+    notes.forEach((f,k)=>{
+      const st = Math.floor((off + k*(dur+gap))*sr), len = Math.floor(dur*sr);
+      for(let i=0;i<len && st+i<n;i++){
+        const t = i/sr, env = Math.min(1, i/200) * Math.exp(-3*t);
+        const v = Math.sin(2*Math.PI*f*t) + 0.5*Math.sin(2*Math.PI*2*f*t) + 0.25*Math.sign(Math.sin(2*Math.PI*f*t));
+        data[st+i] = Math.max(-32767, Math.min(32767, v*env*20000));
+      }
     });
+  }
+  const buf = new ArrayBuffer(44 + n*2), dv = new DataView(buf);
+  const w = (o,s)=>{ for(let i=0;i<s.length;i++) dv.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,"RIFF"); dv.setUint32(4,36+n*2,true); w(8,"WAVE"); w(12,"fmt "); dv.setUint32(16,16,true);
+  dv.setUint16(20,1,true); dv.setUint16(22,1,true); dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true);
+  dv.setUint16(32,2,true); dv.setUint16(34,16,true); w(36,"data"); dv.setUint32(40,n*2,true);
+  new Int16Array(buf,44).set(data);
+  return URL.createObjectURL(new Blob([buf],{type:"audio/wav"}));
+}
+const chime = new Audio(makeChime()); chime.preload = "auto";
+let chimeReady = false;
+try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch{}
+// Llamar dentro de un toque del usuario para que el navegador permita sonar después
+function unlockSound(){
+  if(chimeReady) return;
+  try{
+    chime.muted = true;
+    const p = chime.play();
+    const done = ()=>{ chime.pause(); chime.currentTime = 0; chime.muted = false; chimeReady = true; };
+    p && p.then ? p.then(done).catch(()=>{ chime.muted = false; }) : done();
   }catch{}
-  try{ navigator.vibrate && navigator.vibrate([300,150,300,150,500]); }catch{}
+}
+function ring(txt){
+  try{ chime.currentTime = 0; chime.muted = false; chime.volume = 1; chime.play().catch(()=>{}); }catch{}
+  try{ navigator.vibrate && navigator.vibrate([400,150,400,150,700]); }catch{}
+  flash(txt);
+}
+let flashTimer = null;
+function flash(txt){
+  clearInterval(flashTimer); let k = 0; const t0 = window.__t0 || (window.__t0 = document.title);
+  document.body.classList.add("flash");
+  flashTimer = setInterval(()=>{
+    document.title = (k++%2) ? t0 : (txt||"🔔 ¡Lista!");
+    if(k>16){ clearInterval(flashTimer); document.title = t0; document.body.classList.remove("flash"); }
+  }, 500);
 }
 
 async function send(){
+  unlockSound();
+  if(mode==="evento" && !eventoOk) return closedSheet();
   if(mode==="evento"){ const a = activeEvento(); if(a) return lockSheet(a); }
   const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
   if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
     box.innerHTML = `<p class="err">${mode==="evento"?"Escribe tu nombre para enviar.":"Completa tu nombre, teléfono y dirección para enviar."}</p>`; return;
   }
-  try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); audioCtx.resume(); }catch{}
   btn.disabled = true; btn.textContent = "Enviando…";
   const numero = String(Math.floor(100 + Math.random()*900));
   const orden = {
@@ -279,6 +334,7 @@ async function send(){
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
     items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note})),
     total: mode==="domicilio"?cartTotal():0,
+    evento: E || "domicilio", barra: E ? BARRA : 0,
     estado: "nuevo", creado: serverTimestamp()
   };
   try{
@@ -311,7 +367,7 @@ function loadMine(){
   saveMine();
 }
 function saveMine(){ store.set("nf_mis", JSON.stringify(mine.map(m=>({id:m.id,t:m.t})))); }
-function activeEvento(){ return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.estado!=="entregado"); }
+function activeEvento(){ return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.evento===E && p.estado!=="entregado"); }
 
 function track(id){
   if(watchers[id]) return;
@@ -324,7 +380,7 @@ function track(id){
     }
     const prev = data[id], p = {id, ...snap.data()};
     data[id] = p;
-    if(prev && prev.estado!=="lista" && p.estado==="lista"){ beep(); if(document.visibilityState!=="visible") pendingBeep = true; }
+    if(prev && prev.estado!=="lista" && p.estado==="lista"){ ring(); if(document.visibilityState!=="visible") pendingBeep = true; }
     if(p.estado==="entregado"){ watchers[id](); delete watchers[id]; }
     if(viewing===id) renderStatus(p);
     else if(autoOpen===id && viewing===null && p.estado!=="entregado") showStatus(id);
@@ -334,7 +390,7 @@ function track(id){
 }
 
 function renderMine(){
-  const list = mine.map(m=>data[m.id]).filter(Boolean);
+  const list = mine.map(m=>data[m.id]).filter(p=>p && (E ? p.evento===E : p.modo==="domicilio"));
   const box = $("#mine");
   if(!list.length){ box.hidden = true; return; }
   box.hidden = false;
@@ -371,9 +427,13 @@ function backToMenu(){
   viewing = null;
   $("#status").hidden = true; $("#menuWrap").hidden = false; renderCart(); scrollTo(0,0);
 }
+function closedSheet(){
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>${evento===null?"Un momento…":"Este evento ya cerró"}</h3>
+    <p class="desc" style="font-size:14.5px;margin-top:8px">${evento===null?"Estamos cargando el evento, intenta de nuevo en unos segundos.":"Ya no se reciben pedidos para este evento. ¡Gracias por venir!"}</p>`);
+}
 function lockSheet(p){
-  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Ya tienes una bebida en camino</h3>
-    <p class="desc" style="font-size:14.5px;margin-top:8px">En el evento es una bebida a la vez. Tu pedido <b>#${esc(p.numero)}</b> está <b>${ESTADO_TXT[p.estado]}</b>. Cuando lo recojas en la barra podrás pedir la siguiente.</p>
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Ya tienes una bebida pedida</h3>
+    <p class="desc" style="font-size:14.5px;margin-top:8px">En el evento es una bebida a la vez. Tu pedido <b>#${esc(p.numero)}</b> está <b>${ESTADO_TXT[p.estado]}</b>. Cuando termines tu primera bebida podrás pedir otra.</p>
     <div style="margin-top:18px"><button class="primary" data-mine="${p.id}">Ver mi pedido</button></div>`);
 }
 
@@ -390,15 +450,11 @@ document.addEventListener("click", e=>{
   else if(t.dataset.rm){ cart.splice(+t.dataset.rm,1); cart.length?openCart():(closeSheet(),renderCart()); }
   else if(t.id==="openCart") openCart();
   else if(t.id==="sendBtn") send();
-  else if(t.id==="m-evento"||t.id==="m-domicilio"){
-    const nm = t.id==="m-evento"?"evento":"domicilio";
-    if(nm!==mode){ mode=nm; cart=[]; setModeUI(); renderMenu(); renderCart(); }
-  }
 });
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSheet(); });
-document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible"){ try{ audioCtx && audioCtx.resume().then(()=>{ if(pendingBeep){ pendingBeep=false; beep(); } }); }catch{} } });
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && pendingBeep){ pendingBeep = false; setTimeout(()=>ring(), 400); } });
 
-setModeUI(); renderChips(); renderMenu(); renderCart();
+setModeUI(); renderChips(); renderMenu(); renderCart(); loadEvento();
 loadMine(); mine.forEach(m=>track(m.id));
 autoOpen = mine[0]?.id || null;
 
