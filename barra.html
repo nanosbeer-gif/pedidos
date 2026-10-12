@@ -334,14 +334,15 @@ function colaView(){
 function card(p){
   return `<article class="ord ${p.modo}">
     <header><div class="n">${esc(p.numero)}</div>
-      <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio":(p.barra&&!sel.barra?`Barra ${p.barra} · `:"")}${ago(p.creado)}</small></div></header>
+      <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`Barra ${p.barra} · `:"")}${ago(p.creado)}</small></div></header>
     <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b> <span class="tam">${esc(it.tam)}</span>
       ${(it.opciones||[]).length?`<div class="op">${it.opciones.map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
       ${p.ubicacion&&p.ubicacion.lat?`<div><a class="maplnk" href="https://www.google.com/maps/search/?api=1&query=${p.ubicacion.lat},${p.ubicacion.lng}" target="_blank" rel="noopener">🗺️ Abrir ubicación en Maps</a> <small>(±${p.ubicacion.prec||"?"} m)</small></div>`:`<div><small>Sin ubicación GPS, usar dirección escrita</small></div>`}
-      <div>💵 ${esc(p.pago)} · <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":""}</div>
+      <div>🛵 ${(p.items||[]).reduce((a,it)=>a+(it.cant||1),0)>=2?"Envío <b>gratis</b>":"Envío <b>$20</b> (ya incluido)"}</div>
+      <div>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":" · ya pagado"}</div>
       ${p.estado==="nuevo"&&p.pago==="Transferencia"?`<div class="nocomp">Revisa en tu banco que llegó el pago antes de preparar</div>`:""}
       ${p.pago==="Transferencia"?(p.comprobante?`<button class="compbtn" data-comp="${p.id}"><img src="${p.comprobante}" alt="Comprobante"><span>Ver comprobante</span></button>`:`<div class="nocomp">⚠️ Sin comprobante todavía</div>`):""}</div>`:""}
     ${NEXT[p.estado]?`<div class="acts"><button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
