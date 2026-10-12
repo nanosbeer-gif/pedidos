@@ -4,9 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#140a2e">
+<link rel="icon" type="image/png" href="icon-barra.png">
+<link rel="apple-touch-icon" href="icon-barra.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Barra Nanos">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="robots" content="noindex">
 <title>Barra Nano's Fizz</title>
-<link rel="icon" href="logo.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
 <script src="menu.js"></script>
@@ -42,7 +47,7 @@ h2{font-family:var(--display);font-weight:400;font-size:21px;color:var(--gold);m
 .crumb{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-block:6px}
 .crumb>div{min-width:0;font-size:17px}.crumb b{overflow-wrap:anywhere}
 .bdg{font-size:12px;font-weight:800;background:var(--pink);color:#fff;border-radius:6px;padding:2px 8px;margin-left:8px}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:8px;z-index:2}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:8px;z-index:2}
 .tab{all:unset;cursor:pointer;text-align:center;font-weight:800;font-size:13px;padding:10px 4px;border-radius:12px;background:var(--panel);border:1.5px solid var(--line)}
 .tab span{display:block;font-family:var(--display);font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
 .tab[aria-pressed="true"]{border-color:var(--neon);color:var(--neon)}
@@ -156,6 +161,18 @@ body.tv .top{display:none}
 .rg[aria-pressed="true"]{background:var(--gold);color:#1a0b3a;border-color:var(--gold)}
 .rg:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
 .sec[disabled]{opacity:.4;cursor:not-allowed}
+.tabs .tab{font-size:11.5px}
+.lnkbtn{all:unset;cursor:pointer;display:block;margin-top:10px;color:var(--muted);font-size:13px;font-weight:700;text-decoration:underline}
+.accf{margin-top:12px;background:var(--panel2);border-radius:12px;padding:12px;display:grid;gap:10px}
+.mots{display:flex;flex-wrap:wrap;gap:6px}
+.mot{all:unset;cursor:pointer;font-size:13px;font-weight:700;padding:7px 11px;border-radius:999px;border:1.5px solid var(--line)}
+.mot[aria-pressed="true"]{border-color:var(--pink);color:var(--pink);background:#ff4fb81a}
+.tin{width:100%;box-sizing:border-box;background:var(--bg);border:1.5px solid var(--line);color:var(--fg);border-radius:10px;padding:10px;font:inherit}
+.lbl2{display:grid;gap:5px;font-weight:700;font-size:13px}
+.tagbad{margin-top:10px;background:#ff4fb826;color:var(--pink);border-radius:10px;padding:8px 10px;font-weight:800;font-size:13.5px}
+.tagref{margin-top:10px;background:#ffc53d26;color:var(--gold);border-radius:10px;padding:8px 10px;font-weight:800;font-size:13.5px}
+.ord:has(.tagbad){opacity:.75}
+.go[disabled]{opacity:.45;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -266,7 +283,10 @@ const NEXT = {
   preparando: {to:"lista",      label:"¡Lista! Avisar"},
   lista:      {to:"entregado",  label:"Entregada"}
 };
-const TABS = [["nuevo","Nuevos"],["preparando","Preparando"],["lista","Listos"],["entregado","Entregados"]];
+const TABS = [["nuevo","Nuevos"],["preparando","Prep."],["lista","Listos"],["entregado","Entreg."],["cancelado","Cancel."]];
+const MOT_CANCEL = {domicilio:["Cliente no pagó","No se encontró el domicilio","Cliente no contestó","Cliente canceló","Se terminó el insumo","Pedido duplicado"], evento:["Invitado no llegó por ella","Pedido duplicado","Se terminó el insumo","Invitado canceló"]};
+const MOT_REEMB = ["No le gustó la bebida","Llegó maltratada / derramada","Bebida equivocada","Faltó una bebida","Llegó muy tarde"];
+let accion = null; // {id, tipo:"cancel"|"reemb"}
 
 function go(s){ knownListos = null; sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
 function ev(id){ return eventos.find(e=>e.id===id); }
@@ -395,8 +415,9 @@ function histRes(){
   const n = hist.docs.length;
   if(!n) return `<p class="empty">No hay pedidos en esas fechas.</p>`;
   const dom = hist.docs.filter(d=>d.data.evento==="domicilio"), ev = n - dom.length;
-  const venta = dom.reduce((a,d)=>a+(d.data.total||0),0);
-  return `<div class="kpis"><div><span>${n}</span>Pedidos</div><div><span>${dom.length}</span>A domicilio</div><div><span>${ev}</span>De eventos</div><div><span>${money(venta)}</span>Venta domicilio</div></div>
+  const venta = dom.filter(d=>d.data.estado!=="cancelado").reduce((a,d)=>a+(d.data.total||0)-((d.data.reembolso&&d.data.reembolso.monto)||0),0);
+  const nc = hist.docs.filter(d=>d.data.estado==="cancelado").length, nr = hist.docs.filter(d=>d.data.reembolso).length;
+  return `<div class="kpis"><div><span>${n}</span>Pedidos</div><div><span>${dom.length}</span>A domicilio</div><div><span>${ev}</span>De eventos</div><div><span>${money(venta)}</span>Venta neta domicilio</div>${nc?`<div><span>${nc}</span>Cancelados</div>`:""}${nr?`<div><span>${nr}</span>Reembolsos</div>`:""}</div>
     <div class="evf" style="margin-top:12px">
       <p class="hint" style="margin:0"><b>Paso 1.</b> Descarga el archivo y revisa que se guardó en tu celular (app Archivos → Descargas).</p>
       <button class="go" data-hdl>📥 Descargar archivo de Excel</button>
@@ -423,7 +444,7 @@ async function buscarHist(desde, hasta){
 }
 function descargarHist(){
   const q = v => `"${String(v ?? "").replace(/"/g,'""')}"`;
-  const rows = [["Fecha","Hora","Tipo","Evento","Barra","Número","Nombre","Bebidas","Detalle","Pago","Total","Teléfono","Dirección","Referencias","Ubicación","Comprobante","Estado"]];
+  const rows = [["Fecha","Hora","Tipo","Evento","Barra","Número","Nombre","Bebidas","Detalle","Pago","Total","Teléfono","Dirección","Referencias","Ubicación","Comprobante","Estado","Motivo cancelación","Reembolso","Motivo reembolso"]];
   hist.docs.forEach(({data:p})=>{
     const f = p.creado.toDate();
     rows.push([ymd(f), f.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), p.modo==="domicilio"?"Domicilio":"Evento",
@@ -431,7 +452,7 @@ function descargarHist(){
       (p.items||[]).map(it=>`${it.cant}x ${it.nombre}${it.tam?" ("+it.tam+")":""}`).join(" + "),
       (p.items||[]).map(it=>[...(it.opciones||[]), it.nota?"Nota: "+it.nota:""].filter(Boolean).join(", ")).filter(Boolean).join(" | "),
       p.pago||"", p.modo==="domicilio"?(p.total||0):"", p.tel||"", p.direccion||"", p.ref||"",
-      p.ubicacion?`https://maps.google.com/?q=${p.ubicacion.lat},${p.ubicacion.lng}`:"", p.comprobante?"Sí":"", p.estado]);
+      p.ubicacion?`https://maps.google.com/?q=${p.ubicacion.lat},${p.ubicacion.lng}`:"", p.comprobante?"Sí":"", p.estado, p.cancelMotivo||"", p.reembolso?p.reembolso.monto:"", p.reembolso?p.reembolso.motivo:""]);
   });
   const csv = "\ufeff" + rows.map(r=>r.map(q).join(",")).join("\r\n");
   const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
@@ -520,7 +541,7 @@ function colaView(){
   const list0 = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
   const counts = Object.fromEntries(TABS.map(([k])=>[k, list0.filter(p=>p.estado===k).length]));
   let list = list0.filter(p=>p.estado===tab);
-  if(tab==="entregado") list = list.slice().reverse().slice(0,40);
+  if(tab==="entregado" || tab==="cancelado") list = list.slice().reverse().slice(0,40);
   return `
     <div class="crumb"><button class="sec" data-home>← Eventos</button>
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">Barra ${sel.barra}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
@@ -542,9 +563,26 @@ function card(p){
       <div>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":" · ya pagado"}</div>
       ${p.estado==="nuevo"&&p.pago==="Transferencia"?`<div class="nocomp">Revisa en tu banco que llegó el pago antes de preparar</div>`:""}
       ${p.pago==="Transferencia"?(p.comprobante?`<button class="compbtn" data-comp="${p.id}"><img src="${p.comprobante}" alt="Comprobante"><span>Ver comprobante</span></button>`:`<div class="nocomp">⚠️ Sin comprobante todavía</div>`):""}</div>`:""}
+    ${p.estado==="cancelado"?`<div class="tagbad">❌ Cancelado · ${esc(p.cancelMotivo||"sin motivo")}</div><div class="acts"><button class="back" data-id="${p.id}" data-to="nuevo">Reactivar pedido</button></div>`:""}
+    ${p.reembolso?`<div class="tagref">💸 Reembolso ${money(p.reembolso.monto)} · ${esc(p.reembolso.motivo)}</div>`:""}
     ${NEXT[p.estado]?`<div class="acts"><button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
       ${p.estado!=="nuevo"?`<button class="back" data-id="${p.id}" data-to="${p.estado==="lista"?"preparando":"nuevo"}">Regresar</button>`:""}</div>`:""}
+    ${NEXT[p.estado] && !(accion&&accion.id===p.id)?`<button class="lnkbtn" data-acc="cancel" data-pid="${p.id}">Cancelar pedido</button>`:""}
+    ${p.estado==="entregado" && !(accion&&accion.id===p.id)?`<button class="lnkbtn" data-acc="reemb" data-pid="${p.id}">${p.reembolso?"Cambiar reembolso":"Registrar reembolso"}</button>`:""}
+    ${accion&&accion.id===p.id?accionForm(p):""}
   </article>`;
+}
+function accionForm(p){
+  const cancel = accion.tipo==="cancel", mots = cancel ? MOT_CANCEL[p.modo==="domicilio"?"domicilio":"evento"] : MOT_REEMB;
+  const sel0 = accion.motivo || "";
+  return `<div class="accf">
+    <b>${cancel?"¿Por qué se cancela?":"¿Por qué se reembolsa?"}</b>
+    <div class="mots">${[...mots,"Otro"].map(m=>`<button class="mot" data-mot="${esc(m)}" aria-pressed="${sel0===m}">${esc(m)}</button>`).join("")}</div>
+    ${sel0==="Otro"?`<input id="motOtro${p.id}" class="tin" maxlength="80" placeholder="Escribe el motivo">`:""}
+    ${!cancel?`<label class="lbl2" for="monto${p.id}">Monto a reembolsar<input id="monto${p.id}" class="tin" type="number" min="0" inputmode="numeric" value="${p.reembolso?p.reembolso.monto:(p.total||0)}"></label>`:""}
+    <div class="acts"><button class="go ${cancel?"lista":""}" data-accok="${p.id}" ${sel0?"":"disabled"}>${cancel?"Cancelar pedido":"Guardar reembolso"}</button><button class="back" data-accno>Volver</button></div>
+    ${!cancel && p.reembolso?`<button class="lnkbtn" data-reembdel="${p.id}">Quitar reembolso</button>`:""}
+  </div>`;
 }
 
 function qrView(){
@@ -571,25 +609,27 @@ function pantallaView(){
 }
 function resumenView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
-  const beb = pedidos.reduce((a,p)=>a+(p.items||[]).reduce((x,it)=>x+(it.cant||1),0),0);
-  const ent = pedidos.filter(p=>p.estado==="entregado").length;
-  const pend = pedidos.length - ent;
-  const top = {}; pedidos.forEach(p=>(p.items||[]).forEach(it=>top[it.nombre]=(top[it.nombre]||0)+(it.cant||1)));
+  const todos = pedidos, canc = todos.filter(p=>p.estado==="cancelado").length;
+  const pedidos_ = todos.filter(p=>p.estado!=="cancelado");
+  const beb = pedidos_.reduce((a,p)=>a+(p.items||[]).reduce((x,it)=>x+(it.cant||1),0),0);
+  const ent = pedidos_.filter(p=>p.estado==="entregado").length;
+  const pend = pedidos_.length - ent;
+  const top = {}; pedidos_.forEach(p=>(p.items||[]).forEach(it=>top[it.nombre]=(top[it.nombre]||0)+(it.cant||1)));
   const topList = Object.entries(top).sort((a,b)=>b[1]-a[1]);
-  const porB = Array.from({length:e.barras},(_,k)=>pedidos.filter(p=>p.barra===k+1).length);
+  const porB = Array.from({length:e.barras},(_,k)=>pedidos_.filter(p=>p.barra===k+1).length);
   return `<div class="crumb"><button class="sec" data-home>← Eventos</button><div><b>Resumen · ${esc(e.nombre)}</b></div></div>
     <div class="kpis">
-      <div><span>${pedidos.length}</span>Pedidos</div>
+      <div><span>${pedidos_.length}</span>Pedidos</div>
       <div><span>${beb}</span>Bebidas</div>
       <div><span>${e.personas?(beb/e.personas).toFixed(1):"–"}</span>Bebidas por persona</div>
-      <div><span>${pend}</span>Pendientes</div>
+      <div><span>${pend}</span>Pendientes</div>${canc?`<div><span>${canc}</span>Cancelados</div>`:""}
     </div>
     ${e.barras>1?`<h2>Por barra</h2><div class="bars">${porB.map((n,k)=>`<div>Barra ${k+1}<b>${n}</b></div>`).join("")}</div>`:""}
     <h2>Más pedidas</h2>
-    <div class="top">${topList.length?topList.map(([n,c])=>`<div><span>${esc(n)}</span><b>${c}</b></div>`).join(""):`<p class="empty">Aún no hay pedidos.</p>`}</div>
+    <div class="top">${topList.length?topList.map(([n,c])=>`<div><span>${esc(n)}</span><b>${c}</b></div>`).join(""):`<p class="empty">Aún no hay pedidos_.</p>`}</div>
     <div class="blk">
       ${cerrando===e.id
-        ? `<p class="hint">Al cerrar el evento su QR deja de aceptar pedidos. ${pend?`<b>Quedan ${pend} pedidos sin entregar.</b>`:""}</p>
+        ? `<p class="hint">Al cerrar el evento su QR deja de aceptar pedidos_. ${pend?`<b>Quedan ${pend} pedidos sin entregar.</b>`:""}</p>
            <div class="evb"><button class="go lista" data-cerrar="${e.id}">Sí, cerrar evento</button><button class="sec" data-nocerrar>Cancelar</button></div>`
         : `<button class="sec danger" data-precerrar="${e.id}">Cerrar evento</button>`}
     </div>`;
@@ -678,6 +718,21 @@ document.addEventListener("submit", async e=>{
 });
 document.addEventListener("click", async e=>{
   const t = e.target.closest("button"); if(!t) return;
+  if(t.dataset.acc){ accion = {id:t.dataset.pid, tipo:t.dataset.acc, motivo:""}; render(); return; }
+  if(t.dataset.mot){ accion.motivo = t.dataset.mot; render(); return; }
+  if(t.dataset.accno!==undefined){ accion = null; render(); return; }
+  if(t.dataset.reembdel){ t.disabled = true; try{ await updateDoc(doc(db,"pedidos",t.dataset.reembdel), {reembolso:null}); accion = null; }catch{} render(); return; }
+  if(t.dataset.accok){
+    const id = t.dataset.accok, p = pedidos.find(x=>x.id===id); if(!p || !accion.motivo) return;
+    const motivo = accion.motivo==="Otro" ? (($("#motOtro"+id)?.value||"").trim() || "Otro") : accion.motivo;
+    t.disabled = true;
+    try{
+      if(accion.tipo==="cancel") await updateDoc(doc(db,"pedidos",id), {estado:"cancelado", cancelMotivo:motivo, canceladoEn:serverTimestamp()});
+      else { const monto = Math.max(0, parseInt($("#monto"+id)?.value||"0",10)||0); await updateDoc(doc(db,"pedidos",id), {reembolso:{monto, motivo, en:Timestamp.now()}}); }
+      accion = null;
+    }catch{ t.disabled = false; alert("No se pudo guardar. Revisa el internet."); return; }
+    render(); return;
+  }
   if(t.dataset.comp){ const p = pedidos.find(x=>x.id===t.dataset.comp); if(p){ $("#modalImg").src = p.comprobante; $("#modal").hidden = false; } }
   else if(t.dataset.closemodal!==undefined){ $("#modal").hidden = true; }
   else if(t.dataset.tab){ tab = t.dataset.tab; render(); }
