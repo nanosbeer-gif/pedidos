@@ -111,6 +111,9 @@ textarea.t{min-height:60px;resize:vertical}
 body.flash{animation:fl 1s steps(2) 8}
 @keyframes fl{50%{background:#3b1468}}
 @media (prefers-reduced-motion:reduce){body.flash{animation:none}}
+.aviso{background:#ffc53d1f;border:1.5px solid var(--gold);border-radius:14px;padding:12px 14px;text-align:left;font-size:13.5px;line-height:1.45;margin:0 0 16px}
+.aviso b{display:block;color:var(--gold);font-size:14.5px;margin-bottom:4px}
+.aviso small{display:block;margin-top:6px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -413,7 +416,8 @@ function renderStatus(p){
   const big = p.estado==="lista"
     ? (p.modo==="evento" ? `<div class="ready">¡Tu bebida está lista! 🥤<span>Pasa a la barra y di tu número</span></div>` : `<div class="ready">¡Tu pedido va en camino! 🛵<span>Ten listo tu pago</span></div>`)
     : p.estado==="entregado" ? `<div class="ready done">¡Disfrútala! 💜</div>`
-    : `<p class="wait">${p.estado==="preparando"?"Estamos preparando tu bebida…":"Recibimos tu pedido. Estás en la fila."}<br><small>Deja esta pantalla abierta: aquí te avisamos.</small></p>`;
+    : `<p class="wait">${p.estado==="preparando"?"Estamos preparando tu bebida…":"Recibimos tu pedido. Estás en la fila."}</p>
+      ${p.modo==="evento"?`<div class="aviso"><b>📱 No cierres esta página ni bloquees tu celular.</b>Aquí te avisamos cuando tu bebida esté lista. Tu número también aparece en la pantalla de la barra.<small>¿Se cerró? Vuelve a escanear el QR: tu pedido sigue guardado.</small></div>`:""}`;
   $("#status").innerHTML = `<div class="st">
     <p class="lbl">Tu número</p><div class="num">#${esc(p.numero)}</div><p class="who">${esc(p.nombre)}</p>
     ${big}

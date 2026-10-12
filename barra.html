@@ -88,6 +88,32 @@ h2{font-family:var(--display);font-weight:400;font-size:21px;color:var(--gold);m
 .login button{all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;background:var(--neon);color:#1a0b3a;font-weight:800;padding:14px;border-radius:12px}
 .err{color:var(--pink);font-weight:700;font-size:13px;min-height:1em;margin:0}
 @media (prefers-reduced-motion:reduce){body.flash{animation:none}}
+body.tv{padding-inline:20px}
+body.tv .top{display:none}
+.tvwrap{min-height:100vh;display:flex;flex-direction:column;gap:16px;padding-block:16px}
+.tvh{display:flex;align-items:center;gap:16px}
+.tvh img{width:72px;height:72px}
+.tvh h1{font-family:var(--display);font-weight:400;color:var(--neon);margin:0;font-size:clamp(26px,4vw,48px);line-height:1.05}
+.tvh p{margin:2px 0 0;color:var(--pink);font-weight:800;font-size:clamp(16px,2vw,24px)}
+.tvh>div{flex:1;min-width:0}
+.tvx{opacity:.5}
+.tvcols{display:grid;grid-template-columns:2fr 1fr;gap:16px;flex:1}
+@media (max-width:700px){.tvcols{grid-template-columns:1fr}}
+.tvlist,.tvprep{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:16px;min-width:0}
+.tvlist{border:3px solid var(--neon)}
+.tvcols h2{margin:0 0 12px;font-size:clamp(20px,3vw,36px)}
+.tvlist h2{color:var(--neon)}.tvprep h2{color:var(--muted)}
+.tvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.tvgrid.big{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.tvn{background:var(--panel2);border-radius:16px;padding:10px;text-align:center;min-width:0}
+.tvn b{display:block;font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,64px);line-height:1;color:var(--muted);font-variant-numeric:tabular-nums}
+.tvn span{display:block;font-weight:800;font-size:clamp(14px,1.8vw,22px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.big .tvn{background:var(--neon);color:#1a0b3a;animation:pop .6s ease-out}
+.big .tvn b{color:#1a0b3a;font-size:clamp(44px,7vw,96px)}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.tvempty{color:var(--muted);grid-column:1/-1;text-align:center;padding:20px}
+.tvfoot{text-align:center;color:var(--muted);font-weight:700;margin:0}
+@media (prefers-reduced-motion:reduce){.big .tvn{animation:none}}
 </style>
 </head>
 <body>
@@ -190,7 +216,7 @@ const store = { get(k){ try{return localStorage.getItem(k)}catch{return null} },
 
 // Vista actual: {view:"home"} | {view:"cola", evento:id|"domicilio", barra:0|n} | {view:"qr", evento} | {view:"resumen", evento}
 let sel = JSON.parse(store.get("nf_sel") || '{"view":"home"}');
-let eventosLoaded = false, eventos = [], pedidos = [], tab = "nuevo", unsubEv = null, unsubPed = null, known = null, soundOn = false, wake = null, cerrando = null;
+let knownListos = null, eventosLoaded = false, eventos = [], pedidos = [], tab = "nuevo", unsubEv = null, unsubPed = null, known = null, soundOn = false, wake = null, cerrando = null;
 
 const NEXT = {
   nuevo:      {to:"preparando", label:"Preparar"},
@@ -199,7 +225,7 @@ const NEXT = {
 };
 const TABS = [["nuevo","Nuevos"],["preparando","Preparando"],["lista","Listos"],["entregado","Entregados"]];
 
-function go(s){ sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
+function go(s){ knownListos = null; sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
 function ev(id){ return eventos.find(e=>e.id===id); }
 function fecha(ts){ try{ return ts.toDate().toLocaleDateString("es-MX",{day:"numeric",month:"short"}); }catch{ return "hoy"; } }
 function ago(ts){
@@ -221,7 +247,7 @@ function listenEventos(){
 }
 function listenPedidos(){
   unsubPed && unsubPed(); unsubPed = null; pedidos = [];
-  const id = sel.view==="cola" || sel.view==="resumen" ? sel.evento : null;
+  const id = ["cola","resumen","pantalla"].includes(sel.view) ? sel.evento : null;
   if(!id) return;
   unsubPed = onSnapshot(query(collection(db,"pedidos"), where("evento","==",id)), snap=>{
     let list = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -229,6 +255,7 @@ function listenPedidos(){
     list.sort((a,b)=>(a.creado?.toMillis?.()||Date.now())-(b.creado?.toMillis?.()||Date.now()));
     const mine = list.filter(p=>!sel.barra || p.barra===sel.barra);
     if(known && sel.view==="cola"){ if(mine.some(p=>!known.has(p.id) && p.estado==="nuevo") && soundOn) ring("🔔 Pedido nuevo"); }
+    if(sel.view==="pantalla"){ const listos = new Set(mine.filter(p=>p.estado==="lista").map(p=>p.id)); if(knownListos && [...listos].some(id=>!knownListos.has(id)) && soundOn) ring("🔔 ¡Lista!"); knownListos = listos; }
     known = new Set(mine.map(p=>p.id));
     pedidos = list; setLive(true); render();
   }, ()=>setLive(false));
@@ -238,10 +265,11 @@ function setLive(ok){ const l=$("#live"); if(!l) return; l.textContent = ok?"En 
 // ===== Pantallas =====
 function render(){
   const v = sel.view;
+  document.body.classList.toggle("tv", v==="pantalla");
   if(v!=="home" && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
   const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id]=i.value; });
   const focused = document.activeElement?.id;
-  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : "";
+  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : "";
   Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(i) i.value=val; });
   if(focused){ const f=document.getElementById(focused); if(f && f.matches("input,select")) f.focus(); }
   if(v==="qr") drawQRs();
@@ -257,6 +285,7 @@ function homeView(){
       </div>
       <div class="evb">
         <button class="sec" data-qr="${e.id}">Ver QR</button>
+        ${Array.from({length:e.barras},(_,k)=>`<button class="sec" data-pant="${e.id}" data-b="${e.barras>1?k+1:0}">📺 Pantalla${e.barras>1?" barra "+(k+1):" de listos"}</button>`).join("")}
         <button class="sec" data-res="${e.id}">Resumen</button>
       </div>
     </article>`).join("");
@@ -315,6 +344,22 @@ function qrView(){
   return `<div class="crumb"><button class="sec" data-home>← Eventos</button><div><b>QR · ${esc(e.nombre)}</b></div></div>
     <p class="hint">Mantén presionada la imagen y elige <b>Guardar imagen</b> para imprimirla.${e.barras>1?" Cada barra tiene su propio QR: ponlo solo cerca de esa barra.":""}</p>
     <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}" alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?"Barra "+(k+1):"QR del evento"}</figcaption><a class="sec lnk" href="${BASE}?e=${e.id}${e.barras>1?"&b="+(k+1):""}" target="_blank" rel="noopener">Abrir como invitado</a></figure>`).join("")}</div>`;
+}
+function pantallaView(){
+  const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
+  const mine = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
+  const listos = mine.filter(p=>p.estado==="lista").slice().reverse();
+  const prep = mine.filter(p=>p.estado==="preparando" || p.estado==="nuevo");
+  const tag = p => `<div class="tvn"><b>#${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
+  return `<div class="tvwrap">
+    <header class="tvh"><img src="logo.png" alt=""><div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>Barra ${sel.barra}</p>`:""}</div>
+      <button class="sec tvx" data-salirtv>Salir</button></header>
+    <div class="tvcols">
+      <section class="tvlist"><h2>🥤 ¡Listas! Pasa por tu bebida</h2><div class="tvgrid big">${listos.length?listos.map(tag).join(""):`<p class="tvempty">Aquí aparecen los números listos</p>`}</div></section>
+      <section class="tvprep"><h2>Preparando</h2><div class="tvgrid">${prep.length?prep.map(tag).join(""):`<p class="tvempty">—</p>`}</div></section>
+    </div>
+    <p class="tvfoot">Escanea el QR, pide tu bebida y espera tu número aquí</p>
+  </div>`;
 }
 function resumenView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
@@ -412,6 +457,8 @@ document.addEventListener("click", async e=>{
   const t = e.target.closest("button"); if(!t) return;
   if(t.dataset.tab){ tab = t.dataset.tab; render(); }
   else if(t.dataset.cola){ go({view:"cola", evento:t.dataset.cola, barra:+t.dataset.b||0}); }
+  else if(t.dataset.pant){ go({view:"pantalla", evento:t.dataset.pant, barra:+t.dataset.b||0}); if(!soundOn) $("#soundBtn").click(); try{ document.documentElement.requestFullscreen?.().catch(()=>{}); }catch{} }
+  else if(t.dataset.salirtv!==undefined){ try{ document.fullscreenElement && document.exitFullscreen(); }catch{} go({view:"home"}); }
   else if(t.dataset.qr){ go({view:"qr", evento:t.dataset.qr}); }
   else if(t.dataset.res){ cerrando = null; go({view:"resumen", evento:t.dataset.res}); }
   else if(t.dataset.home!==undefined){ go({view:"home"}); }
