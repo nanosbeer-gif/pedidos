@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#140a2e">
+<meta name="robots" content="noindex">
+<title>Barra Nano's Fizz</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Panel de barra: fila de pedidos por estado, pensado para tablet o celular en la barra */
+:root{--bg:#140a2e;--panel:#21124a;--panel2:#2c1a5e;--line:#3f2a7a;--fg:#f3edff;--muted:#b9a9e6;--neon:#7dff3a;--pink:#ff4fb8;--gold:#ffc53d;
+--display:"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;--body:"Nunito",system-ui,-apple-system,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{margin:0;font-family:var(--body);font-size:15px;padding-inline:16px;padding-block:0 40px;padding-top:env(safe-area-inset-top,0px)}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-block:14px 8px}
+.top h1{font-family:var(--display);font-weight:400;font-size:24px;margin:0;color:var(--neon);flex:1;min-width:0}
+.live{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;border:1.5px solid var(--line);color:var(--muted)}
+.live.on{border-color:var(--neon);color:var(--neon)}.live.off{border-color:var(--pink);color:var(--pink)}
+.btn{all:unset;cursor:pointer;font-weight:800;font-size:13px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--line)}
+.btn[aria-pressed="true"]{border-color:var(--neon);color:var(--neon)}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:8px;z-index:2}
+.tab{all:unset;cursor:pointer;text-align:center;font-weight:800;font-size:13px;padding:10px 4px;border-radius:12px;background:var(--panel);border:1.5px solid var(--line)}
+.tab span{display:block;font-family:var(--display);font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tab[aria-pressed="true"]{border-color:var(--neon);color:var(--neon)}
+.tab:focus-visible,.btn:focus-visible,.go:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+#list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:8px}
+.ord{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--neon);border-radius:16px;padding:14px;min-width:0}
+.ord.domicilio{border-left-color:var(--gold)}
+.ord header{display:flex;gap:12px;align-items:center}
+.ord .n{font-family:var(--display);font-size:38px;line-height:1;color:var(--neon);font-variant-numeric:tabular-nums}
+.ord.domicilio .n{color:var(--gold)}
+.who{min-width:0}.who b{display:block;font-size:17px;overflow-wrap:anywhere}.who small{color:var(--muted);font-weight:700}
+.ord ul{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
+.ord li{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.tam{font-size:12px;font-weight:800;background:var(--bg);border-radius:6px;padding:1px 6px;margin-left:4px}
+.op{color:var(--muted);font-size:13px;margin-top:2px}
+.nota{color:var(--gold);font-size:13px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+.dom{margin-top:10px;font-size:13.5px;line-height:1.6;overflow-wrap:anywhere}
+.sel{user-select:all;font-weight:800}
+.acts{display:flex;gap:8px;margin-top:12px}
+.go{all:unset;cursor:pointer;flex:1;text-align:center;font-weight:800;font-size:16px;padding:13px;border-radius:12px;background:var(--neon);color:#1a0b3a}
+.go.nuevo{background:var(--gold)}.go.lista{background:var(--pink);color:#fff}
+.go[disabled]{opacity:.5}
+.back{all:unset;cursor:pointer;font-weight:700;font-size:13px;padding:13px 10px;color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:40px 10px;grid-column:1/-1}
+.login{max-width:360px;margin:12vh auto 0;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;text-align:center}
+.login h1{font-family:var(--display);font-weight:400;color:var(--neon);margin:10px 0 4px}
+.login p{color:var(--muted);margin:0 0 16px}
+.login input{width:100%;background:var(--bg);border:1.5px solid var(--line);color:var(--fg);border-radius:10px;padding:12px;font:inherit;margin-bottom:12px}
+.login button{all:unset;cursor:pointer;display:block;width:100%;box-sizing:border-box;background:var(--neon);color:#1a0b3a;font-weight:800;padding:14px;border-radius:12px}
+.err{color:var(--pink);font-weight:700;font-size:13px;min-height:1em;margin-top:10px}
+</style>
+</head>
+<body>
+<section id="login" class="login">
+  <img class="logo" style="width:46px;height:46px" alt="Logo Nano's Fizz" src="logo.png">
+  <h1>Barra Nano's Fizz</h1>
+  <p>Entra para ver los pedidos.</p>
+  <form id="loginForm">
+    <input id="pass" type="password" autocomplete="current-password" placeholder="Contraseña de la barra" required>
+    <button id="loginBtn" type="submit">Entrar</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</section>
+<section id="panel" hidden>
+  <div class="top">
+    <img class="logo" style="width:46px;height:46px" alt="Logo Nano's Fizz" src="logo.png">
+    <h1>Pedidos</h1>
+    <span class="live" id="live">Conectando…</span>
+    <button class="btn" id="soundBtn" aria-pressed="false">🔕 Activar sonido</button>
+    <button class="btn" id="outBtn">Salir</button>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+  <div id="list"></div>
+</section>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, orderBy, onSnapshot, doc, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyDP3ZypMhSahfx-e1KEsSh6rsy4IIJakiU",
+  authDomain: "nanos-fizz.firebaseapp.com",
+  projectId: "nanos-fizz",
+  storageBucket: "nanos-fizz.firebasestorage.app",
+  messagingSenderId: "567480397409",
+  appId: "1:567480397409:web:a4c5e7fb65ba931ae00420"
+});
+const db = getFirestore(app), auth = getAuth(app);
+const EMAIL = "barra@nanosfizz.app";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = n => "$" + Number(n||0).toLocaleString("es-MX");
+
+let pedidos = [], tab = "nuevo", unsub = null, known = null, soundOn = false, audioCtx = null, wake = null;
+
+const NEXT = {
+  nuevo:      {to:"preparando", label:"Preparar"},
+  preparando: {to:"lista",      label:"¡Lista! Avisar"},
+  lista:      {to:"entregado",  label:"Entregada"}
+};
+const TABS = [["nuevo","Nuevos"],["preparando","Preparando"],["lista","Listos"],["entregado","Entregados"]];
+
+function ding(){
+  if(!soundOn || !audioCtx) return;
+  try{
+    [0,0.18].forEach((t,k)=>{
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.frequency.value = k ? 1320 : 990; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.3,audioCtx.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+t+0.25);
+      o.start(audioCtx.currentTime+t); o.stop(audioCtx.currentTime+t+0.25);
+    });
+  }catch{}
+}
+async function keepAwake(){ try{ wake = await navigator.wakeLock?.request("screen"); }catch{} }
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && soundOn) keepAwake(); });
+
+function ago(ts){
+  if(!ts) return "ahora";
+  const m = Math.floor((Date.now() - ts.toMillis())/60000);
+  return m < 1 ? "ahora" : m < 60 ? `hace ${m} min` : `hace ${Math.floor(m/60)} h`;
+}
+
+function render(){
+  const counts = Object.fromEntries(TABS.map(([k])=>[k, pedidos.filter(p=>p.estado===k).length]));
+  $("#tabs").innerHTML = TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("");
+  let list = pedidos.filter(p=>p.estado===tab);
+  if(tab==="entregado") list = list.slice().reverse().slice(0,30);
+  $("#list").innerHTML = list.length ? list.map(p=>`
+    <article class="ord ${p.modo}">
+      <header>
+        <div class="n">#${esc(p.numero)}</div>
+        <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio":"🎉 Evento"} · ${ago(p.creado)}</small></div>
+      </header>
+      <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b> <span class="tam">${esc(it.tam)}</span>
+        ${(it.opciones||[]).length?`<div class="op">${it.opciones.map(esc).join(" · ")}</div>`:""}
+        ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
+      ${p.modo==="domicilio"?`<div class="dom">
+        <div>📞 <span class="sel">${esc(p.tel)}</span></div>
+        <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
+        <div>💵 ${esc(p.pago)} · <b>${money(p.total)}</b> + envío</div></div>`:""}
+      ${NEXT[p.estado]?`<div class="acts">
+        <button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
+        ${p.estado!=="nuevo"?`<button class="back" data-id="${p.id}" data-to="${p.estado==="lista"?"preparando":"nuevo"}">Regresar</button>`:""}
+      </div>`:""}
+    </article>`).join("")
+    : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un cliente pida.":"Nada por aquí."}</p>`;
+}
+
+function listen(){
+  unsub && unsub();
+  const desde = Timestamp.fromMillis(Date.now() - 14*3600*1000);
+  const q = query(collection(db,"pedidos"), where("creado",">=",desde), orderBy("creado","asc"));
+  unsub = onSnapshot(q, snap=>{
+    const ids = new Set(snap.docs.map(d=>d.id));
+    if(known){ const nuevos = snap.docs.filter(d=>!known.has(d.id)); if(nuevos.length) ding(); }
+    known = ids;
+    pedidos = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    $("#live").textContent = "En vivo"; $("#live").className = "live on";
+    render();
+  }, err=>{
+    $("#live").textContent = "Sin conexión"; $("#live").className = "live off";
+    console.error(err);
+  });
+}
+
+onAuthStateChanged(auth, u=>{
+  const ok = u && u.email === EMAIL;
+  $("#login").hidden = ok; $("#panel").hidden = !ok;
+  if(ok) listen(); else { unsub && unsub(); unsub = null; known = null; pedidos = []; }
+});
+
+$("#loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const btn = $("#loginBtn"); btn.disabled = true; $("#loginErr").textContent = "";
+  try{ await signInWithEmailAndPassword(auth, EMAIL, $("#pass").value); }
+  catch{ $("#loginErr").textContent = "Contraseña incorrecta. Revisa e intenta de nuevo."; }
+  btn.disabled = false;
+});
+
+document.addEventListener("click", async e=>{
+  const t = e.target.closest("button"); if(!t) return;
+  if(t.dataset.tab){ tab = t.dataset.tab; render(); }
+  else if(t.dataset.to){
+    t.disabled = true;
+    try{ await updateDoc(doc(db,"pedidos",t.dataset.id), {estado:t.dataset.to}); }
+    catch{ t.disabled = false; alert("No se pudo actualizar. Revisa el internet."); }
+  }
+  else if(t.id==="soundBtn"){
+    try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); await audioCtx.resume(); }catch{}
+    soundOn = !soundOn; t.textContent = soundOn ? "🔔 Sonido activado" : "🔕 Activar sonido"; t.setAttribute("aria-pressed", soundOn);
+    if(soundOn){ ding(); keepAwake(); }
+  }
+  else if(t.id==="outBtn") signOut(auth);
+});
+setInterval(()=>{ if(pedidos.length) render(); }, 60000);
+
+</script>
+</body>
+</html>

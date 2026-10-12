@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#140a2e">
+<link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<title>Nano's Fizz Pedidos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Layout: app de una columna, carrito fijo abajo; mundo "galaxia neón" de la marca, solo tema oscuro por diseño */
+:root{
+  --bg:#140a2e; --panel:#21124a; --panel2:#2c1a5e; --line:#3f2a7a;
+  --fg:#f3edff; --muted:#b9a9e6; --neon:#7dff3a; --pink:#ff4fb8; --gold:#ffc53d;
+  --display:"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;
+  --body:"Nunito",system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;padding-inline:16px;padding-block:0 120px;
+  background-image:radial-gradient(1px 1px at 20% 30%,#fff8 50%,transparent),radial-gradient(1px 1px at 70% 10%,#fff6 50%,transparent),radial-gradient(1.5px 1.5px at 85% 60%,#fff5 50%,transparent),radial-gradient(1px 1px at 40% 80%,#fff6 50%,transparent),radial-gradient(ellipse at top,#3a1d7a 0%,var(--bg) 60%);
+  background-attachment:fixed}
+.wrap{max-width:560px;margin:0 auto}
+header{padding-block:22px 10px;display:flex;align-items:center;gap:12px}
+.logo{width:76px;height:76px;flex:none;filter:drop-shadow(0 0 12px #ff4fb866)}
+h1{font-family:var(--display);font-weight:400;font-size:28px;margin:0;color:var(--neon);letter-spacing:.5px;text-shadow:0 0 14px #7dff3a55}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+.mode{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border-radius:14px;padding:4px;margin-block:12px;border:1px solid var(--line)}
+.mode button{all:unset;cursor:pointer;text-align:center;padding:10px 6px;border-radius:10px;font-weight:800;font-size:14px;color:var(--muted)}
+.mode button[aria-pressed="true"]{background:var(--pink);color:#fff}
+.mode button:focus-visible,.chip:focus-visible,.card:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+.note{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-top:8px;z-index:2}
+.chip{all:unset;cursor:pointer;white-space:nowrap;padding:7px 14px;border-radius:999px;border:1.5px solid var(--line);font-weight:700;font-size:13px}
+.chip[aria-pressed="true"]{border-color:var(--neon);color:var(--neon)}
+h2{font-family:var(--display);font-weight:400;font-size:21px;margin:22px 0 10px;color:var(--gold)}
+.list{display:grid;gap:10px}
+.card{all:unset;cursor:pointer;display:grid;grid-template-columns:54px 1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+.card>div{min-width:0}
+.cup{width:54px;height:62px;border-radius:6px 6px 14px 14px;position:relative;overflow:hidden;border:2px solid #ffffff30}
+.cup::after{content:"";position:absolute;inset:auto 8px 6px;height:18px;border-radius:50%;background:#ffffff22}
+.cup i{position:absolute;top:-6px;left:60%;width:4px;height:30px;background:var(--gold);transform:rotate(12deg);border-radius:2px}
+.name{font-weight:800;font-size:16px}
+.desc{color:var(--muted);font-size:12.5px;line-height:1.35;margin-top:3px}
+.price{font-family:var(--display);font-size:20px;color:var(--neon)}
+.cart{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(transparent,var(--bg) 30%);z-index:5}
+.cart button,.primary{all:unset;cursor:pointer;box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;width:100%;max-width:560px;margin:0 auto;background:var(--neon);color:#1a0b3a;font-weight:800;font-size:16px;padding:15px 18px;border-radius:14px}
+.primary{justify-content:center;text-align:center}
+.primary[disabled]{opacity:.45;cursor:not-allowed}
+.sheetbg{position:fixed;inset:0;background:#0009;z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--panel);width:100%;max-width:560px;max-height:88%;overflow:auto;border-radius:22px 22px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom,0px));border-top:2px solid var(--pink)}
+.sheet h3{font-family:var(--display);font-weight:400;font-size:24px;margin:0;color:var(--neon)}
+.grp{margin-top:16px}
+.grp b{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{position:relative}
+.opt input{position:absolute;opacity:0}
+.opt span{display:block;padding:9px 14px;border-radius:12px;border:1.5px solid var(--line);font-weight:700;font-size:14px;cursor:pointer}
+.opt input:checked+span{border-color:var(--neon);background:#7dff3a1a;color:var(--neon)}
+.opt input:focus-visible+span{outline:2px solid var(--neon)}
+label.f{display:block;margin-top:12px;font-weight:700;font-size:13px}
+input.t,textarea.t{width:100%;margin-top:5px;background:var(--bg);border:1.5px solid var(--line);color:var(--fg);border-radius:10px;padding:11px;font:inherit}
+textarea.t{min-height:60px;resize:vertical}
+.qty{display:flex;align-items:center;gap:14px;margin-top:18px}
+.qty button{all:unset;cursor:pointer;width:38px;height:38px;border-radius:50%;background:var(--panel2);text-align:center;font-size:22px;line-height:38px;font-weight:800}
+.qty output{font-weight:800;font-size:18px;min-width:20px;text-align:center}
+.row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.row div{min-width:0}
+.row small{color:var(--muted);display:block}
+.rm{all:unset;cursor:pointer;color:var(--pink);font-size:12.5px;font-weight:700}
+.total{display:flex;justify-content:space-between;font-family:var(--display);font-size:22px;margin:12px 0 4px}
+.total span:last-child{color:var(--neon);font-variant-numeric:tabular-nums}
+.close{all:unset;cursor:pointer;float:right;color:var(--muted);font-weight:800;padding:4px 8px}
+.err{color:var(--pink);font-size:13px;font-weight:700;margin-top:10px}
+.ok{background:#7dff3a1a;border:1px solid var(--neon);border-radius:12px;padding:12px;font-size:13.5px;margin-top:12px}
+.ok a{color:var(--neon);font-weight:800}
+.badge{display:inline-block;font-size:11px;font-weight:800;background:var(--pink);color:#fff;border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:middle}
+.primary[disabled]{opacity:.5}
+.ghost{all:unset;cursor:pointer;box-sizing:border-box;display:block;width:100%;text-align:center;padding:13px;border-radius:14px;border:1.5px solid var(--line);color:var(--muted);font-weight:800;margin-top:18px}
+.st{background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:24px 18px;text-align:center;margin-top:8px}
+.st .primary{margin-top:18px}
+.lbl{margin:0;color:var(--muted);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:800}
+.num{font-family:var(--display);font-size:72px;line-height:1;color:var(--neon);text-shadow:0 0 22px #7dff3a66;font-variant-numeric:tabular-nums}
+.who{margin:4px 0 16px;font-weight:800;font-size:18px}
+.wait{font-size:16px;font-weight:700;line-height:1.5;margin:0 0 16px}
+.wait small{color:var(--muted);font-weight:600}
+.ready{background:var(--neon);color:#1a0b3a;font-family:var(--display);font-size:28px;border-radius:18px;padding:18px 12px;margin-bottom:16px;animation:pulse 1.2s ease-in-out infinite}
+.ready span{display:block;font-family:var(--body);font-size:15px;font-weight:800;margin-top:4px}
+.ready.done{background:var(--pink);color:#fff;animation:none}
+@keyframes pulse{50%{transform:scale(1.03);box-shadow:0 0 30px #7dff3a88}}
+@media (prefers-reduced-motion:reduce){.ready{animation:none}}
+.steps{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.steps li{font-size:11.5px;font-weight:800;color:var(--muted);padding-top:10px;border-top:4px solid var(--line)}
+.steps li.ok{border-color:var(--pink);color:var(--fg)}
+.steps li.now{border-color:var(--neon);color:var(--neon)}
+.mini{margin-top:16px;color:var(--muted);font-size:13.5px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <img class="logo" alt="Logo Nano's Fizz" src="logo.png">
+    <div><h1>Nano's Fizz</h1><p class="sub">Pide desde tu cel. Nosotros te avisamos.</p></div>
+  </header>
+  <div id="menuWrap">
+    <div class="mode" role="group" aria-label="Tipo de pedido">
+      <button id="m-evento" aria-pressed="true">🎉 Estoy en el evento</button>
+      <button id="m-domicilio" aria-pressed="false">🛵 A domicilio</button>
+    </div>
+    <p class="note" id="modeNote"></p>
+    <nav class="chips" id="chips" aria-label="Categorías"></nav>
+    <main id="menu"></main>
+  </div>
+  <section id="status" hidden aria-live="polite"></section>
+</div>
+
+<div class="cart" id="cartBar" hidden><button id="openCart"><span id="cartCount">0 bebidas</span><span>Ver pedido · <span id="cartTotal">$0</span></span></button></div>
+<div class="sheetbg" id="sheetBg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, addDoc, doc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDP3ZypMhSahfx-e1KEsSh6rsy4IIJakiU",
+  authDomain: "nanos-fizz.firebaseapp.com",
+  projectId: "nanos-fizz",
+  storageBucket: "nanos-fizz.firebasestorage.app",
+  messagingSenderId: "567480397409",
+  appId: "1:567480397409:web:a4c5e7fb65ba931ae00420"
+};
+const db = getFirestore(initializeApp(firebaseConfig));
+const EXTRA_LITRO = 30;
+
+const CATS = [
+  {id:"clasicas", name:"Clásicas"},
+  {id:"nano", name:"Especiales Nano"},
+  {id:"mojitos", name:"Mojitos"}
+];
+const ITEMS = [
+  {id:"smoothie",cat:"clasicas",name:"Smoothie",price:60,color:"#ff9f1c,#ff4f6a",desc:"Refrescante, con mucho hielo y trozos de fruta natural.",groups:[{name:"Sabor",opts:["Mango","Fresa"]}]},
+  {id:"soda",cat:"clasicas",name:"Soda italiana",price:60,color:"#ffd23f,#ff4f6a",desc:"Refrescante a base de té con distintos sabores.",groups:[{name:"Sabor",opts:["Fresa","Mango","Mora azul","Manzana verde","Frutos rojos"]},{name:"Toppings",opts:["Perlas explosivas","Jelly"]}]},
+  {id:"frappe",cat:"clasicas",name:"Frappuccino",price:70,color:"#c98b5a,#5a2f1a",desc:"Frío, cremoso, con crema batida.",groups:[{name:"Sabor",opts:["Fresa","Caramelo","Chocolate"]}]},
+  {id:"tapioca",cat:"clasicas",name:"Tapioca",price:70,color:"#9b7bd6,#6fbf6a",desc:"Cremosa, con perlas de tapioca.",groups:[{name:"Sabor",opts:["Taro","Caramelo","Matcha"]}]},
+  {id:"pina",cat:"clasicas",name:"Piña colada",price:70,color:"#fff3c4,#f5c75a",desc:"Jugo de piña, lechera, crema de coco, un toque de canela y hielo.",groups:[]},
+  {id:"pitufina",cat:"nano",name:"Nano Pitufina",price:60,color:"#ff3355,#a3002a",desc:"Sirope mora azul, Sprite y un toque de limón. Incluye banderilla de gomitas.",groups:[]},
+  {id:"pitufo",cat:"nano",name:"Nano Pitufo",price:60,color:"#5fd3ff,#1a5cff",desc:"La azul de la casa. Incluye banderilla de gomitas.",groups:[]},
+  {id:"barbie",cat:"nano",name:"Barbie Pink",price:60,color:"#ffd1ea,#ff4fb8",desc:"Pulpa de algodón de azúcar, refresco de frutos rojos y agua mineral. Incluye banderilla de gomitas.",groups:[]},
+  {id:"linterna",cat:"nano",name:"Linterna Verde",price:60,color:"#b6ff6a,#2fae2f",desc:"Sirope y pulpa de manzana verde, Sprite y un toque de limón. Incluye banderilla de gomitas.",groups:[]},
+  {id:"sangria",cat:"nano",name:"Sangría preparada",price:60,color:"#8a1030,#3a0614",desc:"Escarchada, bien fría.",groups:[]},
+  {id:"mojito",cat:"mojitos",name:"Mojito natural",price:60,color:"#e9ffd6,#7fdc5a",desc:"Sprite, limón, azúcar, menta y hierbabuena. Escarchado con pulpa y chilito de manzana verde.",groups:[{name:"Escarchado",opts:["Con chilito","Sin chilito"]}]},
+  {id:"mojitofr",cat:"mojitos",name:"Mojito frutos rojos",price:60,color:"#ff6b8a,#7a1036",desc:"Fresa, blueberry y frambuesa trituradas, sirope, Sprite, limón y azúcar. Escarchado con chilito.",groups:[{name:"Hierba",opts:["Menta","Hierbabuena"]},{name:"Escarchado",opts:["Con chilito","Sin chilito"]}]}
+];
+
+let mode = "evento", cat = "todas", cart = [], unsub = null, lastEstado = "", audioCtx = null;
+const $ = s => document.querySelector(s);
+const money = n => "$" + n.toLocaleString("es-MX");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const store = { get(k){ try{return localStorage.getItem(k)}catch{return null} }, set(k,v){ try{localStorage.setItem(k,v)}catch{} }, del(k){ try{localStorage.removeItem(k)}catch{} } };
+
+// Modo inicial desde el link: ?modo=domicilio
+if (new URLSearchParams(location.search).get("modo") === "domicilio") mode = "domicilio";
+
+function setModeUI(){
+  $("#m-evento").setAttribute("aria-pressed", mode==="evento");
+  $("#m-domicilio").setAttribute("aria-pressed", mode==="domicilio");
+  $("#modeNote").textContent = mode==="evento"
+    ? "Tus bebidas ya están incluidas en el evento. Pide aquí y te avisamos en esta pantalla cuando esté lista para que pases a la barra."
+    : "Bebidas de medio litro. Agranda a 1 litro por +$30.";
+}
+function renderChips(){
+  const all = [{id:"todas",name:"Todas"}, ...CATS];
+  $("#chips").innerHTML = all.map(c=>`<button class="chip" data-c="${c.id}" aria-pressed="${cat===c.id}">${c.name}</button>`).join("");
+}
+function cupStyle(i){ const [a,b]=i.color.split(","); return `background:linear-gradient(${a},${b})`; }
+function renderMenu(){
+  const cats = cat==="todas" ? CATS : CATS.filter(c=>c.id===cat);
+  $("#menu").innerHTML = cats.map(c=>`<h2>${c.name}</h2><div class="list">${
+    ITEMS.filter(i=>i.cat===c.id).map(i=>`<button class="card" data-i="${i.id}">
+      <span class="cup" style="${cupStyle(i)}"><i></i></span>
+      <div><div class="name">${i.name}</div><div class="desc">${i.desc}</div></div>
+      ${mode==="domicilio"?`<span class="price">${money(i.price)}</span>`:`<span class="price" style="font-size:14px">Pedir</span>`}</button>`).join("")}</div>`).join("");
+}
+function cartTotal(){ return cart.reduce((a,l)=>a+l.qty*l.unit,0); }
+function renderCart(){
+  const n = cart.reduce((a,l)=>a+l.qty,0);
+  $("#cartBar").hidden = n===0 || !$("#status").hidden;
+  $("#cartCount").textContent = n + (n===1?" bebida":" bebidas");
+  $("#cartTotal").textContent = mode==="evento" ? "Listo" : money(cartTotal());
+}
+function openSheet(html){ $("#sheet").innerHTML = html; $("#sheetBg").hidden = false; }
+function closeSheet(){ $("#sheetBg").hidden = true; }
+
+function openItem(id){
+  const i = ITEMS.find(x=>x.id===id);
+  const g = i.groups.map((gr,gi)=>`<div class="grp"><b>${gr.name}</b><div class="opts">${
+    gr.opts.map((o,oi)=>`<label class="opt"><input type="radio" name="g${gi}" id="g${gi}o${oi}" value="${esc(o)}" ${oi===0?"checked":""}><span>${o}</span></label>`).join("")}</div></div>`).join("");
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>${i.name}</h3><p class="desc">${i.desc}</p>
+    <div class="grp"><b>Tamaño</b><div class="opts">
+      <label class="opt"><input type="radio" name="size" id="s1" value="0" checked><span>½ litro${mode==="domicilio"?" · "+money(i.price):""}</span></label>
+      <label class="opt"><input type="radio" name="size" id="s2" value="1"><span>1 litro${mode==="domicilio"?" · "+money(i.price+EXTRA_LITRO):""}</span></label>
+    </div></div>${g}
+    <label class="f" for="itemNote">¿Algo más? (opcional)<textarea class="t" id="itemNote" maxlength="120" placeholder="Ej. poco hielo, sin limón"></textarea></label>
+    <div class="qty"><button data-q="-1" aria-label="Menos">−</button><output id="q">1</output><button data-q="1" aria-label="Más">+</button></div>
+    <div style="margin-top:18px"><button class="primary" data-add="${i.id}">Agregar al pedido</button></div>`);
+}
+function addItem(id){
+  const i = ITEMS.find(x=>x.id===id);
+  const big = document.querySelector('input[name="size"]:checked')?.value==="1";
+  const choices = i.groups.map((gr,gi)=>gr.name+": "+document.querySelector(`input[name="g${gi}"]:checked`).value);
+  cart.push({name:i.name,size:big?"1 L":"½ L",unit:i.price+(big?EXTRA_LITRO:0),qty:Math.min(10,+$("#q").textContent),choices,note:$("#itemNote").value.trim()});
+  closeSheet(); renderCart();
+}
+function openCart(){
+  const rows = cart.map((l,k)=>`<div class="row"><div><b>${l.qty}× ${l.name} (${l.size})</b>
+     <small>${[...l.choices, l.note && ("Nota: "+esc(l.note))].filter(Boolean).join(" · ")}</small>
+     <button class="rm" data-rm="${k}">Quitar</button></div><div>${mode==="domicilio"?money(l.qty*l.unit):""}</div></div>`).join("");
+  const datos = mode==="evento"
+    ? `<label class="f" for="nombre">Tu nombre<input class="t" id="nombre" maxlength="40" autocomplete="given-name" placeholder="Para llamarte cuando esté lista" value="${esc(store.get("nf_nombre")||"")}"></label>`
+    : `<label class="f" for="nombre">Tu nombre<input class="t" id="nombre" maxlength="40" autocomplete="name" value="${esc(store.get("nf_nombre")||"")}"></label>
+       <label class="f" for="tel">Teléfono<input class="t" id="tel" type="tel" maxlength="15" autocomplete="tel"></label>
+       <label class="f" for="lugar">Dirección<input class="t" id="lugar" maxlength="120" autocomplete="street-address" placeholder="Calle, número, colonia"></label>
+       <label class="f" for="ref">Referencias (opcional)<input class="t" id="ref" maxlength="80" placeholder="Ej. portón negro"></label>`;
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Tu pedido <span class="badge">${mode==="evento"?"En el evento":"A domicilio"}</span></h3>
+    ${rows}
+    ${mode==="domicilio"?`<div class="total"><span>Total</span><span>${money(cartTotal())}</span></div><p class="note">El costo de envío se confirma al llamarte.</p>`:`<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`}
+    <div class="grp"><b>Tus datos</b>${datos}</div>
+    ${mode==="domicilio"?`<div class="grp"><b>Pago</b><div class="opts">
+      <label class="opt"><input type="radio" name="pago" id="p1" value="Efectivo" checked><span>Efectivo</span></label>
+      <label class="opt"><input type="radio" name="pago" id="p2" value="Transferencia"><span>Transferencia</span></label>
+    </div></div>`:""}
+    <div id="msg"></div>
+    <div style="margin-top:16px"><button class="primary" id="sendBtn">Enviar pedido</button></div>`);
+}
+
+function beep(){
+  try{
+    if(!audioCtx) return;
+    [0,0.25,0.5].forEach(t=>{
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.frequency.value=880; o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.25,audioCtx.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+t+0.2);
+      o.start(audioCtx.currentTime+t); o.stop(audioCtx.currentTime+t+0.2);
+    });
+  }catch{}
+  try{ navigator.vibrate && navigator.vibrate([300,150,300,150,500]); }catch{}
+}
+
+async function send(){
+  const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
+  if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
+    box.innerHTML = `<p class="err">${mode==="evento"?"Escribe tu nombre para enviar.":"Completa tu nombre, teléfono y dirección para enviar."}</p>`; return;
+  }
+  try{ audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); audioCtx.resume(); }catch{}
+  btn.disabled = true; btn.textContent = "Enviando…";
+  const numero = String(Math.floor(100 + Math.random()*900));
+  const data = {
+    modo: mode, numero, nombre: v("nombre"),
+    tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
+    pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
+    items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note})),
+    total: mode==="domicilio"?cartTotal():0,
+    estado: "nuevo", creado: serverTimestamp()
+  };
+  try{
+    const ref = await addDoc(collection(db,"pedidos"), data);
+    store.set("nf_nombre", data.nombre);
+    store.set("nf_pedido", ref.id);
+    cart = []; closeSheet(); watchOrder(ref.id);
+  }catch(e){
+    btn.disabled = false; btn.textContent = "Enviar pedido";
+    box.innerHTML = `<p class="err">No se pudo enviar. Revisa tu señal y vuelve a intentar.</p>`;
+  }
+}
+
+const PASOS = {
+  evento:   [["nuevo","Recibido"],["preparando","Preparando"],["lista","¡Lista!"],["entregado","Entregada"]],
+  domicilio:[["nuevo","Recibido"],["preparando","Preparando"],["lista","En camino"],["entregado","Entregado"]]
+};
+function watchOrder(id){
+  unsub && unsub();
+  $("#menuWrap").hidden = true; $("#status").hidden = false; renderCart();
+  $("#status").innerHTML = `<div class="st"><p class="note">Cargando tu pedido…</p></div>`;
+  unsub = onSnapshot(doc(db,"pedidos",id), snap=>{
+    if(!snap.exists()){ store.del("nf_pedido"); newOrder(); return; }
+    const p = snap.data(), pasos = PASOS[p.modo]||PASOS.evento, idx = Math.max(0, pasos.findIndex(x=>x[0]===p.estado));
+    if(p.estado==="lista" && lastEstado && lastEstado!=="lista") beep();
+    lastEstado = p.estado;
+    const big = p.estado==="lista"
+      ? (p.modo==="evento" ? `<div class="ready">¡Tu bebida está lista! 🥤<span>Pasa a la barra y di tu número</span></div>` : `<div class="ready">¡Tu pedido va en camino! 🛵<span>Ten listo tu pago</span></div>`)
+      : p.estado==="entregado" ? `<div class="ready done">¡Disfrútala! 💜</div>`
+      : `<p class="wait">${p.estado==="preparando"?"Estamos preparando tu bebida…":"Recibimos tu pedido. Estás en la fila."}<br><small>No cierres esta pantalla: aquí te avisamos.</small></p>`;
+    $("#status").innerHTML = `<div class="st">
+      <p class="lbl">Tu número</p><div class="num">#${esc(p.numero)}</div><p class="who">${esc(p.nombre)}</p>
+      ${big}
+      <ol class="steps">${pasos.map((s,k)=>`<li class="${k<idx?"ok":k===idx?"now":""}">${s[1]}</li>`).join("")}</ol>
+      <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)} (${esc(it.tam)})</div>`).join("")}</div>
+      ${p.estado==="entregado"?`<button class="primary" id="newBtn">Pedir otra bebida</button>`:`<button class="ghost" id="newBtn">Hacer otro pedido</button>`}
+    </div>`;
+  }, ()=>{ $("#status").innerHTML = `<div class="st"><p class="err">Se perdió la conexión. Revisa tu señal; esta pantalla se actualiza sola.</p><button class="ghost" id="newBtn">Volver al menú</button></div>`; });
+}
+function newOrder(){
+  unsub && unsub(); unsub = null; lastEstado = "";
+  store.del("nf_pedido");
+  $("#status").hidden = true; $("#menuWrap").hidden = false; renderCart(); scrollTo(0,0);
+}
+
+document.addEventListener("click", e=>{
+  if(e.target.id==="sheetBg"){ closeSheet(); return; }
+  const t = e.target.closest("button"); if(!t) return;
+  if(t.dataset.c){ cat=t.dataset.c; renderChips(); renderMenu(); }
+  else if(t.dataset.i) openItem(t.dataset.i);
+  else if(t.dataset.q){ const q=$("#q"); q.textContent=Math.min(10,Math.max(1,+q.textContent+ +t.dataset.q)); }
+  else if(t.dataset.add) addItem(t.dataset.add);
+  else if(t.dataset.close!==undefined) closeSheet();
+  else if(t.dataset.rm){ cart.splice(+t.dataset.rm,1); cart.length?openCart():(closeSheet(),renderCart()); }
+  else if(t.id==="openCart") openCart();
+  else if(t.id==="sendBtn") send();
+  else if(t.id==="newBtn") newOrder();
+  else if(t.id==="m-evento"||t.id==="m-domicilio"){
+    const nm = t.id==="m-evento"?"evento":"domicilio";
+    if(nm!==mode){ mode=nm; cart=[]; setModeUI(); renderMenu(); renderCart(); }
+  }
+});
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSheet(); });
+
+setModeUI(); renderChips(); renderMenu(); renderCart();
+const prev = store.get("nf_pedido"); if(prev) watchOrder(prev);
+
+</script>
+</body>
+</html>
