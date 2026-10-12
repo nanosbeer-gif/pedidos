@@ -126,6 +126,10 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 .price.agt{font-family:var(--body);font-size:13px;font-weight:800;color:var(--pink)}
 .opt.off span{opacity:.45;text-decoration:line-through;cursor:not-allowed}
 .closed{color:var(--pink);font-weight:800}
+.sa{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid var(--line);cursor:pointer}
+.sa input{width:24px;height:24px;accent-color:var(--neon);flex:none}
+.sa b{display:block;font-size:15px}.sa small{color:var(--muted);font-size:12.5px}
+.sa:has(input:checked){border-color:var(--neon);background:#7dff3a14}
 </style>
 </head>
 <body>
@@ -291,6 +295,7 @@ function openItem(id){
       <label class="opt"><input type="radio" name="size" id="s2" value="1"><span>1 litro${mode==="domicilio"?" · "+money(i.price+EXTRA_LITRO):""}</span></label>
     </div></div>`}${g}
     ${mode==="domicilio" && (EXTRAS[i.id]||[]).length ? `<div class="grp"><b>Extras</b><div class="opts">${EXTRAS[i.id].map((x,xi)=>`<label class="opt"><input type="checkbox" name="ex" id="ex${xi}" value="${xi}"><span>${esc(x.n)} · +${money(x.p)}</span></label>`).join("")}</div></div>` : ""}
+    ${i.sinAlcohol?`<label class="sa" for="sinAlc"><input type="checkbox" id="sinAlc"><span><b>Sin alcohol</b><small>Márcala si la quieres sin alcohol</small></span></label>`:""}
     <label class="f" for="itemNote">¿Algo más? (opcional)<textarea class="t" id="itemNote" maxlength="120" placeholder="Ej. poco hielo, sin limón"></textarea></label>
     ${mode==="domicilio"?`<div class="qty"><button data-q="-1" aria-label="Menos">−</button><output id="q">1</output><button data-q="1" aria-label="Más">+</button></div>`:""}
     <div style="margin-top:18px"><button class="primary" data-add="${i.id}">${mode==="evento"?"Pedir esta bebida":"Agregar al pedido"}</button></div>`);
@@ -298,7 +303,8 @@ function openItem(id){
 function addItem(id){
   const i = ITEMS.find(x=>x.id===id);
   const big = document.querySelector('input[name="size"]:checked')?.value==="1";
-  const choices = i.groups.map((gr,gi)=>gr.name+": "+(document.querySelector(`input[name="g${gi}"]:checked`)?.value||"—"));
+  const sinAlc = !!(i.sinAlcohol && $("#sinAlc")?.checked);
+  const choices = (sinAlc ? ["🚫 SIN ALCOHOL"] : []).concat(i.groups.map((gr,gi)=>gr.name+": "+(document.querySelector(`input[name="g${gi}"]:checked`)?.value||"—")));
   const ex = mode==="domicilio" ? [...document.querySelectorAll('input[name="ex"]:checked')].map(x=>(EXTRAS[i.id]||[])[+x.value]).filter(Boolean) : [];
   ex.forEach(x=>choices.push(x.n+" (+"+money(x.p)+")"));
   const line = {name:i.name,size:i.noSize?"":(big?"1 L":"½ L"),unit:(i.price||0)+(big&&!i.noSize?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};

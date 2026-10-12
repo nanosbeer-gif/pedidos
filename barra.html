@@ -138,6 +138,7 @@ body.tv .top{display:none}
 .hrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg);border-radius:10px;padding:8px}
 .hday{display:flex!important;align-items:center;gap:8px;min-width:120px;font-size:14px!important}
 .hrow input[type=time]{width:auto!important;padding:8px!important}
+.sinalc{display:inline-block;margin-top:4px;background:var(--pink);color:#fff;font-weight:800;font-size:13px;border-radius:6px;padding:2px 8px}
 </style>
 </head>
 <body>
@@ -410,7 +411,7 @@ function card(p){
     <header><div class="n">${esc(p.numero)}</div>
       <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`Barra ${p.barra} · `:"")}${ago(p.creado)}</small></div></header>
     <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
-      ${(it.opciones||[]).length?`<div class="op">${it.opciones.map(esc).join(" · ")}</div>`:""}
+      ${(it.opciones||[]).includes("🚫 SIN ALCOHOL")?`<div class="sinalc">🚫 SIN ALCOHOL</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
