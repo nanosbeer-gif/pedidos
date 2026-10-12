@@ -103,17 +103,23 @@ body.tv .top{display:none}
 .tvlist{border:3px solid var(--neon)}
 .tvcols h2{margin:0 0 12px;font-size:clamp(20px,3vw,36px)}
 .tvlist h2{color:var(--neon)}.tvprep h2{color:var(--muted)}
-.tvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
-.tvgrid.big{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
-.tvn{background:var(--panel2);border-radius:16px;padding:10px;text-align:center;min-width:0}
-.tvn b{display:block;font-family:var(--display);font-weight:400;font-size:clamp(34px,5vw,64px);line-height:1;color:var(--muted);font-variant-numeric:tabular-nums}
+.tvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tvgrid.big{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.tvn{background:var(--panel2);border-radius:16px;padding:12px 8px;text-align:center;min-width:0;container-type:inline-size}
+.tvn b{display:block;font-family:var(--display);font-weight:400;font-size:clamp(30px,34cqi,64px);line-height:1.05;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tvn span{display:block;font-weight:800;font-size:clamp(14px,1.8vw,22px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .big .tvn{background:var(--neon);color:#1a0b3a;animation:pop .6s ease-out}
-.big .tvn b{color:#1a0b3a;font-size:clamp(44px,7vw,96px)}
+.big .tvn b{color:#1a0b3a;font-size:clamp(40px,38cqi,110px)}
 @keyframes pop{from{transform:scale(.6);opacity:0}}
 .tvempty{color:var(--muted);grid-column:1/-1;text-align:center;padding:20px}
 .tvfoot{text-align:center;color:var(--muted);font-weight:700;margin:0}
 @media (prefers-reduced-motion:reduce){.big .tvn{animation:none}}
+.maplnk{color:var(--neon);font-weight:800;text-decoration:none}
+.compbtn{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;margin-top:8px;background:var(--panel2);border-radius:10px;padding:6px;font-weight:800}
+.compbtn img{width:44px;height:56px;object-fit:cover;border-radius:6px}
+.nocomp{color:var(--gold);font-weight:800;margin-top:6px}
+.modal{position:fixed;inset:0;background:#000d;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px}
+.modal img{max-width:100%;max-height:80vh;border-radius:12px}
 </style>
 </head>
 <body>
@@ -137,6 +143,7 @@ body.tv .top{display:none}
     <button class="btn" id="outBtn">Salir</button>
   </div>
   <main id="main"></main>
+  <div id="modal" class="modal" hidden><button class="sec" data-closemodal>Cerrar ✕</button><img id="modalImg" alt="Comprobante"></div>
 </section>
 </div>
 <script type="module">
@@ -326,14 +333,16 @@ function colaView(){
 }
 function card(p){
   return `<article class="ord ${p.modo}">
-    <header><div class="n">#${esc(p.numero)}</div>
+    <header><div class="n">${esc(p.numero)}</div>
       <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio":(p.barra&&!sel.barra?`Barra ${p.barra} · `:"")}${ago(p.creado)}</small></div></header>
     <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b> <span class="tam">${esc(it.tam)}</span>
       ${(it.opciones||[]).length?`<div class="op">${it.opciones.map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
-      <div>💵 ${esc(p.pago)} · <b>${money(p.total)}</b> + envío</div></div>`:""}
+      ${p.ubicacion&&p.ubicacion.lat?`<div><a class="maplnk" href="https://www.google.com/maps/search/?api=1&query=${p.ubicacion.lat},${p.ubicacion.lng}" target="_blank" rel="noopener">🗺️ Abrir ubicación en Maps</a> <small>(±${p.ubicacion.prec||"?"} m)</small></div>`:`<div><small>Sin ubicación GPS, usar dirección escrita</small></div>`}
+      <div>💵 ${esc(p.pago)} · <b>${money(p.total)}</b> + envío</div>
+      ${p.pago==="Transferencia"?(p.comprobante?`<button class="compbtn" data-comp="${p.id}"><img src="${p.comprobante}" alt="Comprobante"><span>Ver comprobante</span></button>`:`<div class="nocomp">⚠️ Sin comprobante todavía</div>`):""}</div>`:""}
     ${NEXT[p.estado]?`<div class="acts"><button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
       ${p.estado!=="nuevo"?`<button class="back" data-id="${p.id}" data-to="${p.estado==="lista"?"preparando":"nuevo"}">Regresar</button>`:""}</div>`:""}
   </article>`;
@@ -350,7 +359,7 @@ function pantallaView(){
   const mine = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
   const listos = mine.filter(p=>p.estado==="lista").slice().reverse();
   const prep = mine.filter(p=>p.estado==="preparando" || p.estado==="nuevo");
-  const tag = p => `<div class="tvn"><b>#${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
+  const tag = p => `<div class="tvn"><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
   return `<div class="tvwrap">
     <header class="tvh"><img src="logo.png" alt=""><div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>Barra ${sel.barra}</p>`:""}</div>
       <button class="sec tvx" data-salirtv>Salir</button></header>
@@ -455,7 +464,9 @@ document.addEventListener("submit", async e=>{
 });
 document.addEventListener("click", async e=>{
   const t = e.target.closest("button"); if(!t) return;
-  if(t.dataset.tab){ tab = t.dataset.tab; render(); }
+  if(t.dataset.comp){ const p = pedidos.find(x=>x.id===t.dataset.comp); if(p){ $("#modalImg").src = p.comprobante; $("#modal").hidden = false; } }
+  else if(t.dataset.closemodal!==undefined){ $("#modal").hidden = true; }
+  else if(t.dataset.tab){ tab = t.dataset.tab; render(); }
   else if(t.dataset.cola){ go({view:"cola", evento:t.dataset.cola, barra:+t.dataset.b||0}); }
   else if(t.dataset.pant){ go({view:"pantalla", evento:t.dataset.pant, barra:+t.dataset.b||0}); if(!soundOn) $("#soundBtn").click(); try{ document.documentElement.requestFullscreen?.().catch(()=>{}); }catch{} }
   else if(t.dataset.salirtv!==undefined){ try{ document.fullscreenElement && document.exitFullscreen(); }catch{} go({view:"home"}); }
