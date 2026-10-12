@@ -134,11 +134,28 @@ body.tv .top{display:none}
 .schip{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line)}
 .schip.off{border-color:var(--pink);color:var(--pink);text-decoration:line-through}
 .mtog:focus-visible,.schip:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
-.hr{display:grid;gap:8px}
-.hrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg);border-radius:10px;padding:8px}
-.hday{display:flex!important;align-items:center;gap:8px;min-width:120px;font-size:14px!important}
-.hrow input[type=time]{width:auto!important;padding:8px!important}
 .sinalc{display:inline-block;margin-top:4px;background:var(--pink);color:#fff;font-weight:800;font-size:13px;border-radius:6px;padding:2px 8px}
+.hr{display:grid;gap:10px}
+.hday{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.evf .hname{display:flex!important;align-items:center;gap:10px;font-size:16px!important;cursor:pointer}
+.evf .hname input,.evf .h2t input{width:22px!important;height:22px;flex:none;padding:0!important;accent-color:var(--neon)}
+.hname b{flex:1}
+.hst{font-size:12px;font-weight:800;color:var(--pink)}
+.hname:has(input:checked) .hst{color:var(--neon)}
+.hturns{display:grid;gap:8px;margin-top:10px}
+.hday:has(.hname input:not(:checked)) .hturns{display:none}
+.ht{display:flex;align-items:center;gap:8px}
+.hl{font-size:11px;color:var(--muted);font-weight:800;width:44px;flex:none;line-height:1.1}
+.evf .ht input{width:0!important;flex:1 1 0;min-width:0;padding:8px 6px!important;font-size:14px}
+.evf,.hr,.hday,.hturns,.ht{min-width:0;max-width:100%}
+.hday{overflow:hidden}
+.evf .h2t{display:flex!important;align-items:center;gap:10px;font-size:13px!important;color:var(--muted);cursor:pointer}
+.hturns:has(.h2t input:not(:checked)) .t2{display:none}
+.rangos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.rg{all:unset;cursor:pointer;text-align:center;font-weight:800;font-size:13px;padding:8px 4px;border-radius:999px;border:1.5px solid var(--line)}
+.rg[aria-pressed="true"]{background:var(--gold);color:#1a0b3a;border-color:var(--gold)}
+.rg:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+.sec[disabled]{opacity:.4;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -167,7 +184,7 @@ body.tv .top{display:none}
 </div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, getDocs, getDoc, setDoc, writeBatch, Timestamp, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const app = initializeApp({
@@ -271,13 +288,25 @@ function listenEventos(){
     setLive(true); render();
   }, ()=>setLive(false));
 }
+let domRango = "hoy";
+const RANGOS = [["hoy","Hoy"],["3d","3 días"],["semana","Semana"],["mes","Mes"]];
+function desdeRango(r){
+  const d = new Date(); d.setHours(0,0,0,0);
+  if(r==="3d") d.setDate(d.getDate()-2);
+  if(r==="semana") d.setDate(d.getDate()-((d.getDay()+6)%7));
+  if(r==="mes") d.setDate(1);
+  return d;
+}
 function listenPedidos(){
   unsubPed && unsubPed(); unsubPed = null; pedidos = [];
   const id = ["cola","resumen","pantalla"].includes(sel.view) ? sel.evento : null;
   if(!id) return;
-  unsubPed = onSnapshot(query(collection(db,"pedidos"), where("evento","==",id)), snap=>{
+  const q = id==="domicilio"
+    ? query(collection(db,"pedidos"), where("creado",">=",Timestamp.fromDate(desdeRango(domRango))))
+    : query(collection(db,"pedidos"), where("evento","==",id));
+  unsubPed = onSnapshot(q, snap=>{
     let list = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    if(id==="domicilio"){ const desde = Date.now()-24*3600*1000; list = list.filter(p=>!p.creado || p.creado.toMillis()>=desde); }
+    if(id==="domicilio") list = list.filter(p=>p.evento==="domicilio");
     list.sort((a,b)=>(a.creado?.toMillis?.()||Date.now())-(b.creado?.toMillis?.()||Date.now()));
     const mine = list.filter(p=>!sel.barra || p.barra===sel.barra);
     if(known && sel.view==="cola"){ if(mine.some(p=>!known.has(p.id) && p.estado==="nuevo") && soundOn) ring("🔔 Pedido nuevo"); }
@@ -293,10 +322,11 @@ function render(){
   const v = sel.view;
   document.body.classList.toggle("tv", v==="pantalla");
   if(["cola","qr","resumen","pantalla"].includes(v) && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
-  const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id]=i.value; });
+  const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id] = i.type==="checkbox" ? {c:i.checked} : i.value; });
   const focused = document.activeElement?.id;
-  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : "";
-  Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(i) i.value=val; });
+  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : "";
+  if(freshForm){ freshForm = false; for(const k in keep) if(/^h/.test(k)) delete keep[k]; }
+  Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(!i) return; if(val && typeof val==="object") i.checked = val.c; else i.value = val; });
   if(focused){ const f=document.getElementById(focused); if(f && f.matches("input,select")) f.focus(); }
   if(v==="qr") drawQRs();
 }
@@ -340,16 +370,96 @@ function homeView(){
     </section>
     <section class="blk">
       <h2>Menú y horario</h2>
-      <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button></div>
+      <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button><button class="sec" data-view="historial">📥 Descargar y vaciar pedidos</button></div>
     </section>`;
+}
+// ===== Historial: descargar en Excel y vaciar =====
+let hist = null; // {desde, hasta, docs:[...], descargado:false, borrando:false, msg:""}
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function semanaPasada(){ const a = desdeRango("semana"); a.setDate(a.getDate()-7); const b = new Date(a); b.setDate(b.getDate()+6); return [ymd(a), ymd(b)]; }
+function historialView(){
+  const [d0,d1] = hist ? [hist.desde, hist.hasta] : semanaPasada();
+  return `<div class="crumb"><button class="sec" data-home>← Inicio</button><div><b>Descargar y vaciar pedidos</b></div></div>
+    <p class="hint">Descarga los pedidos de unas fechas en un archivo que abre en Excel. Después puedes borrarlos de la app para que la base de datos no se llene. Los pedidos de hoy no se pueden borrar.</p>
+    <form id="hsForm" class="evf">
+      <div class="row2">
+        <label for="hsDe">Del<input type="date" id="hsDe" value="${d0}"></label>
+        <label for="hsA">Al<input type="date" id="hsA" value="${d1}"></label>
+      </div>
+      <div class="evb"><button type="button" class="sec" data-hq="semana-pasada">Semana pasada</button><button type="button" class="sec" data-hq="mes-pasado">Mes pasado</button><button type="button" class="sec" data-hq="este-mes">Este mes</button></div>
+      <button class="go" type="submit" id="hsBtn">Buscar pedidos</button>
+    </form>
+    <div id="hsRes">${hist && hist.docs ? histRes() : ""}</div>`;
+}
+function histRes(){
+  const n = hist.docs.length;
+  if(!n) return `<p class="empty">No hay pedidos en esas fechas.</p>`;
+  const dom = hist.docs.filter(d=>d.data.evento==="domicilio"), ev = n - dom.length;
+  const venta = dom.reduce((a,d)=>a+(d.data.total||0),0);
+  return `<div class="kpis"><div><span>${n}</span>Pedidos</div><div><span>${dom.length}</span>A domicilio</div><div><span>${ev}</span>De eventos</div><div><span>${money(venta)}</span>Venta domicilio</div></div>
+    <div class="evf" style="margin-top:12px">
+      <p class="hint" style="margin:0"><b>Paso 1.</b> Descarga el archivo y revisa que se guardó en tu celular (app Archivos → Descargas).</p>
+      <button class="go" data-hdl>📥 Descargar archivo de Excel</button>
+      <p class="hint" style="margin:0"><b>Paso 2.</b> Ya que lo tengas guardado, borra estos pedidos de la app.</p>
+      ${hist.confirmar
+        ? `<p class="nocomp" style="margin:0">Se borrarán ${n} pedidos para siempre, incluidas sus fotos de comprobante. No se puede deshacer.</p>
+           <div class="evb"><button class="go lista" data-hdel>Sí, borrar ${n} pedidos</button><button class="sec" data-hno>Cancelar</button></div>`
+        : `<button class="sec danger" data-hpre ${hist.descargado?"":"disabled"}>🗑️ Borrar estos ${n} pedidos</button>${hist.descargado?"":`<p class="hint" style="margin:0;font-size:12.5px">Primero descarga el archivo.</p>`}`}
+      ${hist.msg?`<p class="hint" style="margin:0;color:var(--neon)">${hist.msg}</p>`:""}
+    </div>`;
+}
+async function buscarHist(desde, hasta){
+  const a = new Date(desde+"T00:00:00"), b = new Date(hasta+"T00:00:00"); b.setDate(b.getDate()+1);
+  hist = {desde, hasta, docs:null, descargado:false, confirmar:false, msg:""}; render();
+  $("#hsRes").innerHTML = `<p class="hint">Buscando…</p>`;
+  try{
+    const snap = await getDocs(query(collection(db,"pedidos"), where("creado",">=",Timestamp.fromDate(a)), where("creado","<",Timestamp.fromDate(b))));
+    hist.docs = snap.docs.map(d=>({id:d.id, data:d.data()})).sort((x,y)=>x.data.creado.toMillis()-y.data.creado.toMillis());
+    const ids = [...new Set(hist.docs.map(d=>d.data.evento).filter(e=>e && e!=="domicilio"))];
+    hist.evNames = {};
+    await Promise.all(ids.map(async id=>{ try{ const e = ev(id) || (await getDoc(doc(db,"eventos",id))).data(); hist.evNames[id] = e?.nombre || id; }catch{ hist.evNames[id] = id; } }));
+  }catch(e){ hist.docs = []; hist.msg = "No se pudo buscar. Revisa el internet."; }
+  render();
+}
+function descargarHist(){
+  const q = v => `"${String(v ?? "").replace(/"/g,'""')}"`;
+  const rows = [["Fecha","Hora","Tipo","Evento","Barra","Número","Nombre","Bebidas","Detalle","Pago","Total","Teléfono","Dirección","Referencias","Ubicación","Comprobante","Estado"]];
+  hist.docs.forEach(({data:p})=>{
+    const f = p.creado.toDate();
+    rows.push([ymd(f), f.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), p.modo==="domicilio"?"Domicilio":"Evento",
+      p.evento==="domicilio"?"":(hist.evNames[p.evento]||""), p.barra||"", p.numero, p.nombre,
+      (p.items||[]).map(it=>`${it.cant}x ${it.nombre}${it.tam?" ("+it.tam+")":""}`).join(" + "),
+      (p.items||[]).map(it=>[...(it.opciones||[]), it.nota?"Nota: "+it.nota:""].filter(Boolean).join(", ")).filter(Boolean).join(" | "),
+      p.pago||"", p.modo==="domicilio"?(p.total||0):"", p.tel||"", p.direccion||"", p.ref||"",
+      p.ubicacion?`https://maps.google.com/?q=${p.ubicacion.lat},${p.ubicacion.lng}`:"", p.comprobante?"Sí":"", p.estado]);
+  });
+  const csv = "\ufeff" + rows.map(r=>r.map(q).join(",")).join("\r\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `pedidos_${hist.desde}_al_${hist.hasta}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  hist.descargado = true; hist.msg = "Archivo descargado. Revisa que esté en tu celular antes de borrar."; render();
+}
+async function borrarHist(){
+  const hoy = desdeRango("hoy").getTime();
+  const lista = hist.docs.filter(d=>d.data.creado.toMillis() < hoy);
+  hist.msg = "Borrando…"; hist.confirmar = false; render();
+  try{
+    for(let i=0;i<lista.length;i+=400){
+      const b = writeBatch(db); lista.slice(i,i+400).forEach(d=>b.delete(doc(db,"pedidos",d.id))); await b.commit();
+    }
+    const quedan = hist.docs.length - lista.length;
+    hist.docs = hist.docs.filter(d=>d.data.creado.toMillis() >= hoy);
+    hist.msg = `Listo: se borraron ${lista.length} pedidos.${quedan?` ${quedan} de hoy se quedaron.`:""}`;
+  }catch{ hist.msg = "No se pudo borrar. Revisa el internet e intenta de nuevo."; }
+  render();
 }
 
 // ===== Menú: disponible / agotado =====
 const NFM = window.NF_MENU;
-let agotados = {}, tienda = null, menuMarca = "fizz";
+let agotados = {}, tienda = null, menuMarca = "fizz", freshForm = false;
 function listenConfig(){
   onSnapshot(doc(db,"config","menu"), s=>{ agotados = (s.exists() && s.data().agotados) || {}; if(["menu","home"].includes(sel.view)) render(); }, ()=>{});
-  onSnapshot(doc(db,"config","tienda"), s=>{ tienda = s.exists() ? s.data() : null; if(["horario","home"].includes(sel.view)) render(); }, ()=>{});
+  onSnapshot(doc(db,"config","tienda"), s=>{ tienda = s.exists() ? s.data() : null; if(["horario","home"].includes(sel.view)){ freshForm = true; render(); } }, ()=>{});
 }
 async function setAgotado(key, val){
   const nuevo = {...agotados}; if(val) nuevo[key] = true; else delete nuevo[key];
@@ -377,6 +487,11 @@ function tiendaTxt(){
   if(!tienda) return "Domicilio: <b>abierto siempre</b> (aún no configuras horario).";
   return tienda.modo==="cerrado" ? "Domicilio: <b style='color:var(--pink)'>CERRADO</b> (manual)." : tienda.modo==="abierto" ? "Domicilio: <b style='color:var(--neon)'>ABIERTO</b> (manual)." : "Domicilio: <b>automático por horario</b>.";
 }
+function normDia(x, i){
+  if(!x) return {on: i!==1, turnos:[{abre:"13:00", cierra:"21:00"}]};
+  if(x.turnos && x.turnos.length) return {on: !!x.on, turnos: x.turnos};
+  return {on: !!x.on, turnos:[{abre: x.abre||"13:00", cierra: x.cierra||"21:00"}]};
+}
 function horarioView(){
   const t = tienda || {modo:"auto", dias:{}}, d = t.dias || {};
   return `<div class="crumb"><button class="sec" data-home>← Inicio</button><div><b>Horario de domicilio</b></div></div>
@@ -387,9 +502,15 @@ function horarioView(){
         <option value="abierto" ${t.modo==="abierto"?"selected":""}>Abierta ahora (ignora horario)</option>
         <option value="cerrado" ${t.modo==="cerrado"?"selected":""}>Cerrada ahora (ignora horario)</option></select></label>
       <label for="hrAviso">Mensaje cuando la cierras a mano (opcional)<input id="hrAviso" maxlength="80" placeholder="Ej. Hoy no hay servicio, ¡nos vemos mañana!" value="${esc(t.aviso||"")}"></label>
-      <div class="hr">${DIAS.map((n,i)=>{ const x = d[i] || {on:i!==1, abre:"13:00", cierra:"21:00"}; return `
-        <div class="hrow"><label class="hday"><input type="checkbox" id="hon${i}" ${x.on?"checked":""}> ${n}</label>
-          <input type="time" id="hab${i}" value="${esc(x.abre)}"> <span>a</span> <input type="time" id="hci${i}" value="${esc(x.cierra)}"></div>`; }).join("")}</div>
+      <div class="hr">${DIAS.map((n,i)=>{ const x = normDia(d[i], i), t1 = x.turnos[0], t2 = x.turnos[1] || {abre:"17:00", cierra:"21:00"}; return `
+        <div class="hday">
+          <label class="hname" for="hon${i}"><input type="checkbox" id="hon${i}" ${x.on?"checked":""}><b>${n}</b><span class="hst">${x.on?"Abierto":"Cerrado"}</span></label>
+          <div class="hturns">
+            <div class="ht"><span class="hl">Turno 1</span><input type="time" id="hab${i}" value="${esc(t1.abre)}"><span>a</span><input type="time" id="hci${i}" value="${esc(t1.cierra)}"></div>
+            <label class="h2t" for="h2on${i}"><input type="checkbox" id="h2on${i}" ${x.turnos[1]?"checked":""}> Agregar segundo turno (ej. mañana y tarde)</label>
+            <div class="ht t2"><span class="hl">Turno 2</span><input type="time" id="hab2${i}" value="${esc(t2.abre)}"><span>a</span><input type="time" id="hci2${i}" value="${esc(t2.cierra)}"></div>
+          </div>
+        </div>`; }).join("")}</div>
       <button class="go" type="submit" id="hrBtn">Guardar horario</button>
       <p class="err" id="hrMsg"></p>
     </form>`;
@@ -403,6 +524,7 @@ function colaView(){
   return `
     <div class="crumb"><button class="sec" data-home>← Eventos</button>
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">Barra ${sel.barra}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
+    ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
 }
@@ -528,9 +650,15 @@ $("#loginForm").addEventListener("submit", async e=>{
   btn.disabled = false;
 });
 document.addEventListener("submit", async e=>{
+  if(e.target.id==="hsForm"){ e.preventDefault(); const a = $("#hsDe").value, b = $("#hsA").value; if(a && b && a<=b) buscarHist(a,b); return; }
   if(e.target.id==="hrForm"){
     e.preventDefault();
-    const dias = {}; for(let i=0;i<7;i++) dias[i] = {on: $("#hon"+i).checked, abre: $("#hab"+i).value || "13:00", cierra: $("#hci"+i).value || "21:00"};
+    const dias = {};
+    for(let i=0;i<7;i++){
+      const turnos = [{abre: $("#hab"+i).value || "13:00", cierra: $("#hci"+i).value || "21:00"}];
+      if($("#h2on"+i).checked) turnos.push({abre: $("#hab2"+i).value || "17:00", cierra: $("#hci2"+i).value || "21:00"});
+      dias[i] = {on: $("#hon"+i).checked, turnos};
+    }
     const data = {modo: $("#hrModo").value, aviso: $("#hrAviso").value.trim(), dias};
     $("#hrBtn").disabled = true;
     try{ await setDoc(doc(db,"config","tienda"), data); tienda = data; $("#hrMsg").style.color = "var(--neon)"; $("#hrMsg").textContent = "Guardado ✓"; }
@@ -559,7 +687,19 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.qr){ go({view:"qr", evento:t.dataset.qr}); }
   else if(t.dataset.res){ cerrando = null; go({view:"resumen", evento:t.dataset.res}); }
   else if(t.dataset.home!==undefined){ go({view:"home"}); }
-  else if(t.dataset.view){ go({view:t.dataset.view}); }
+  else if(t.dataset.view){ if(t.dataset.view==="historial") hist = null; go({view:t.dataset.view}); }
+  else if(t.dataset.rango){ domRango = t.dataset.rango; known = null; listenPedidos(); render(); }
+  else if(t.dataset.hq){
+    const now = new Date(); let a, b;
+    if(t.dataset.hq==="semana-pasada"){ [a,b] = semanaPasada(); }
+    else if(t.dataset.hq==="mes-pasado"){ const x = new Date(now.getFullYear(), now.getMonth()-1, 1), y = new Date(now.getFullYear(), now.getMonth(), 0); a = ymd(x); b = ymd(y); }
+    else { a = ymd(new Date(now.getFullYear(), now.getMonth(), 1)); b = ymd(now); }
+    $("#hsDe").value = a; $("#hsA").value = b; buscarHist(a,b);
+  }
+  else if(t.dataset.hdl!==undefined){ descargarHist(); }
+  else if(t.dataset.hpre!==undefined){ hist.confirmar = true; render(); }
+  else if(t.dataset.hno!==undefined){ hist.confirmar = false; render(); }
+  else if(t.dataset.hdel!==undefined){ borrarHist(); }
   else if(t.dataset.mmarca){ menuMarca = t.dataset.mmarca; render(); }
   else if(t.dataset.ag){ setAgotado(t.dataset.ag, !agotados[t.dataset.ag]); }
   else if(t.dataset.precerrar){ cerrando = t.dataset.precerrar; render(); }

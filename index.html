@@ -197,16 +197,24 @@ function mxNow(){
   return { d: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(g("weekday")), m: (+g("hour"))*60 + (+g("minute")) };
 }
 const toMin = h => { const [a,b] = String(h||"0:0").split(":"); return (+a)*60 + (+b||0); };
+function turnosDe(x){ if(!x || !x.on) return []; return (x.turnos && x.turnos.length) ? x.turnos : [{abre:x.abre, cierra:x.cierra}]; }
+const fmt12 = h => { let [a,b] = String(h).split(":").map(Number); const pm = a>=12; a = a%12 || 12; return a + (b?":"+String(b).padStart(2,"0"):"") + (pm?" pm":" am"); };
 function tiendaAbierta(){
   if(!tienda || tienda.modo==="abierto") return {abierta:true};
   if(tienda.modo==="cerrado") return {abierta:false, msg: tienda.aviso || "Por hoy no estamos recibiendo pedidos."};
   const dias = tienda.dias || {}, now = mxNow();
-  const dentro = (d, m) => { const x = dias[d]; if(!x || !x.on) return false; const a = toMin(x.abre), c = toMin(x.cierra); return c > a ? (m >= a && m < c) : (m >= a || m < c); };
-  const ayer = (now.d+6)%7, xa = dias[ayer];
-  if(dentro(now.d, now.m) || (xa && xa.on && toMin(xa.cierra) < toMin(xa.abre) && now.m < toMin(xa.cierra))) return {abierta:true};
-  for(let k=0;k<7;k++){
-    const d = (now.d+k)%7, x = dias[d];
-    if(x && x.on && (k>0 || toMin(x.abre) > now.m)) return {abierta:false, msg: `Abrimos ${k===0?"hoy":k===1?"mañana":"el "+DIAS[d]} a las ${x.abre}.`};
+  for(const t of turnosDe(dias[now.d])){
+    const a = toMin(t.abre), z = toMin(t.cierra);
+    if(z > a ? (now.m >= a && now.m < z) : (now.m >= a)) return {abierta:true};
+  }
+  for(const t of turnosDe(dias[(now.d+6)%7])){
+    const a = toMin(t.abre), z = toMin(t.cierra);
+    if(z <= a && now.m < z) return {abierta:true};
+  }
+  for(let k=0;k<8;k++){
+    const d = (now.d+k)%7;
+    const next = turnosDe(dias[d]).map(t=>t.abre).filter(h=>k>0 || toMin(h) > now.m).sort((x,y)=>toMin(x)-toMin(y))[0];
+    if(next) return {abierta:false, msg: `Abrimos ${k===0?"hoy":k===1?"mañana":"el "+DIAS[d]} a las ${fmt12(next)}.`};
   }
   return {abierta:false, msg:"Por ahora no tenemos horario disponible."};
 }
