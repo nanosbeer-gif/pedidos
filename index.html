@@ -188,9 +188,14 @@ const ITEMS = [
   {id:"mojitofr",cat:"mojitos",name:"Mojito frutos rojos",price:60,color:"#ff6b8a,#7a1036",desc:"Fresa, blueberry y frambuesa trituradas, sirope de frutos rojos, Sprite, limón y azúcar.",groups:[{name:"Hierba",opts:["Menta","Hierbabuena"]}]}
 ];
 // Extras con costo (solo a domicilio). Formato: idBebida: [{n:"Nombre", p:precio}]
-const EXTRAS = {};
+const EXTRAS = {
+  frappe:  [{n:"Extra crema batida", p:10}],
+  tapioca: [{n:"Extra crema batida", p:10}, {n:"Extra tapioca", p:10}]
+};
+// Envío: $20 con 1 bebida; gratis desde 2 bebidas
+function envio(){ const n = cart.reduce((a,l)=>a+l.qty,0); return n>=2 ? 0 : 20; }
 // Datos para transferencia (se muestran al cliente si están llenos)
-const TRANSFER = { banco:"", titular:"", clabe:"" };
+const TRANSFER = { banco:"Plata", titular:"Adrián Sánchez González", clabe:"646198405606567407" };
 
 let cat = "todas", cart = [], pendingBeep = false;
 const QS = new URLSearchParams(location.search);
@@ -241,7 +246,7 @@ function renderCart(){
   const n = cart.reduce((a,l)=>a+l.qty,0);
   $("#cartBar").hidden = n===0 || !$("#status").hidden;
   $("#cartCount").textContent = n + (n===1?" bebida":" bebidas");
-  $("#cartTotal").textContent = mode==="evento" ? "Listo" : money(cartTotal());
+  $("#cartTotal").textContent = mode==="evento" ? "Listo" : money(cartTotal()+envio());
 }
 function openSheet(html){ $("#sheet").innerHTML = html; $("#sheetBg").hidden = false; }
 function closeSheet(){ $("#sheetBg").hidden = true; }
@@ -267,7 +272,7 @@ function addItem(id){
   const big = document.querySelector('input[name="size"]:checked')?.value==="1";
   const choices = i.groups.map((gr,gi)=>gr.name+": "+document.querySelector(`input[name="g${gi}"]:checked`).value);
   const ex = mode==="domicilio" ? [...document.querySelectorAll('input[name="ex"]:checked')].map(x=>(EXTRAS[i.id]||[])[+x.value]).filter(Boolean) : [];
-  ex.forEach(x=>choices.push("Extra: "+x.n));
+  ex.forEach(x=>choices.push(x.n+" (+"+money(x.p)+")"));
   const line = {name:i.name,size:big?"1 L":"½ L",unit:i.price+(big?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};
   if(mode==="evento"){ cart = [line]; renderCart(); openCart(); return; }
   cart.push(line); renderCart(); upsell(line);
@@ -276,7 +281,7 @@ function upsell(line){
   const n = cart.reduce((a,l)=>a+l.qty,0);
   openSheet(`<h3>✓ Agregado</h3>
     <p class="desc" style="font-size:15px;margin-top:6px">${line.qty}× ${esc(line.name)} (${line.size}) ya está en tu pedido.<br>Llevas <b>${n} ${n===1?"bebida":"bebidas"}</b> · <b>${money(cartTotal())}</b></p>
-    <p class="desc" style="font-size:15px;margin-top:10px">¿Quieres agregar otra bebida?</p>
+    <p class="desc" style="font-size:15px;margin-top:10px">${n===1?"¿Quieres agregar otra bebida? <b style='color:var(--neon)'>Con 2 bebidas el envío es gratis.</b>":"¿Quieres agregar otra bebida?"}</p>
     <div style="margin-top:16px;display:grid;gap:10px"><button class="primary" data-close>Sí, agregar otra bebida</button><button class="ghost" id="openCart2" style="margin-top:0">No, ver mi pedido</button></div>`);
 }
 let ubic = null, compData = "";
@@ -287,25 +292,26 @@ function openCart(){
   const datos = mode==="evento"
     ? `<label class="f" for="nombre">Tu nombre<input class="t" id="nombre" maxlength="40" autocomplete="given-name" placeholder="Para llamarte cuando esté lista" value="${esc(store.get("nf_nombre")||"")}"></label>`
     : `<label class="f" for="nombre">Tu nombre<input class="t" id="nombre" maxlength="40" autocomplete="name" value="${esc(store.get("nf_nombre")||"")}"></label>
-       <label class="f" for="tel">Teléfono<input class="t" id="tel" type="tel" maxlength="15" autocomplete="tel"></label>
-       <label class="f" for="lugar">Dirección<input class="t" id="lugar" maxlength="120" autocomplete="street-address" placeholder="Calle, número, colonia"></label>
-       <label class="f" for="ref">Referencias (opcional)<input class="t" id="ref" maxlength="80" placeholder="Ej. portón negro"></label>
+       <label class="f" for="tel">Teléfono<input class="t" id="tel" type="tel" maxlength="15" autocomplete="tel" value="${esc(store.get("nf_tel")||"")}"></label>
+       <label class="f" for="lugar">Dirección<input class="t" id="lugar" maxlength="120" autocomplete="street-address" placeholder="Calle, número, colonia" value="${esc(store.get("nf_dir")||"")}"></label>
+       <label class="f" for="ref">Referencias (opcional)<input class="t" id="ref" maxlength="80" placeholder="Ej. portón negro" value="${esc(store.get("nf_ref")||"")}"></label>
        <button class="ghost" id="geoBtn" style="margin-top:12px">📍 ${ubic?"Ubicación agregada ✓ (toca para actualizar)":"Compartir mi ubicación"}</button>
        <p class="note" id="geoMsg" style="margin-top:6px">${ubic?`Precisión aprox. ${Math.round(ubic.prec)} m`:"Así el repartidor llega directo a tu puerta."}</p>`;
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Tu pedido <span class="badge">${mode==="evento"?"En el evento":"A domicilio"}</span></h3>
     ${rows}
     ${mode==="domicilio"?`<button class="ghost" data-close style="margin-top:10px">+ Agregar otra bebida</button>`:""}
-    ${mode==="domicilio"?`<div class="total"><span>Total</span><span>${money(cartTotal())}</span></div><p class="note">El costo de envío se confirma al llamarte.</p>`:`<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`}
+    ${mode==="domicilio"?`<div class="row"><div>Envío${envio()?`<small>¡Gratis pidiendo 2 bebidas o más!</small>`:""}</div><div>${envio()?money(envio()):"<b style='color:var(--neon)'>Gratis</b>"}</div></div><div class="total"><span>Total a pagar</span><span>${money(cartTotal()+envio())}</span></div>`:`<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`}
     <div class="grp"><b>Tus datos</b>${datos}</div>
     ${mode==="domicilio"?`<div class="grp"><b>Pago</b><div class="opts">
       <label class="opt"><input type="radio" name="pago" id="p1" value="Efectivo" checked><span>Efectivo</span></label>
       <label class="opt"><input type="radio" name="pago" id="p2" value="Transferencia"><span>Transferencia</span></label>
       <label class="opt"><input type="radio" name="pago" id="p3" value="Tarjeta al recibir"><span>Tarjeta al recibir</span></label>
     </div>
+    <p class="note" id="pagoNote" style="margin-top:8px">Pagas en efectivo al recibir tu pedido.</p>
     <div id="transfBox" hidden>${transferInfo()}
       <label class="ghost" for="compFile" style="display:block;margin-top:10px">🧾 ${compData?"Comprobante listo ✓ (toca para cambiar)":"Subir foto del comprobante"}</label>
       <input type="file" id="compFile" accept="image/*" hidden>
-      <p class="note" style="margin-top:6px">Si aún no transfieres, puedes subirlo después desde la pantalla de tu pedido.</p>
+      <p class="note" style="margin-top:6px">Necesitamos la foto del comprobante para enviar tu pedido.</p>
     </div></div>`:""}
     <div id="msg"></div>
     <div style="margin-top:16px"><button class="primary" id="sendBtn">Enviar pedido</button></div>`);
@@ -365,7 +371,7 @@ function flash(txt){
 
 function transferInfo(){
   const t = TRANSFER;
-  return t.clabe ? `<div class="aviso" style="margin-top:12px"><b>Datos para transferir</b>${esc(t.banco)} · ${esc(t.titular)}<br>CLABE: <span style="user-select:all;font-weight:800">${esc(t.clabe)}</span><small>El total final incluye el envío; te lo confirmamos al llamarte.</small></div>`
+  return t.clabe ? `<div class="aviso" style="margin-top:12px"><b>Datos para transferir</b>${esc(t.banco)} · ${esc(t.titular)}<br>CLABE: <span style="user-select:all;font-weight:800">${esc(t.clabe)}</span> <button class="rm" data-copy="${esc(t.clabe)}" style="margin-left:6px">Copiar</button><small>Transfiere el total exacto y sube la foto del comprobante.</small></div>`
     : `<p class="note" style="margin-top:10px">Te enviamos los datos para transferir al confirmar tu pedido.</p>`;
 }
 function compressImage(file){
@@ -406,6 +412,9 @@ async function send(){
   if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
     box.innerHTML = `<p class="err">${mode==="evento"?"Escribe tu nombre para enviar.":"Completa tu nombre, teléfono y dirección para enviar."}</p>`; return;
   }
+  if(mode==="domicilio" && document.querySelector('input[name="pago"]:checked')?.value==="Transferencia" && !compData){
+    box.innerHTML = `<p class="err">Sube la foto de tu comprobante de transferencia para enviar el pedido.</p>`; return;
+  }
   btn.disabled = true; btn.textContent = "Enviando…";
   const numero = String(Math.floor(100 + Math.random()*900));
   const orden = {
@@ -413,7 +422,7 @@ async function send(){
     tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
     items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note})),
-    total: mode==="domicilio"?cartTotal():0,
+    total: mode==="domicilio"?cartTotal()+envio():0,
     evento: E || "domicilio", barra: E ? BARRA : 0,
     ubicacion: mode==="domicilio" && ubic ? ubic : null,
     comprobante: mode==="domicilio" && document.querySelector('input[name="pago"]:checked')?.value==="Transferencia" ? compData : "",
@@ -422,6 +431,7 @@ async function send(){
   try{
     const ref = await addDoc(collection(db,"pedidos"), orden);
     store.set("nf_nombre", orden.nombre);
+    if(mode==="domicilio"){ store.set("nf_tel", orden.tel); store.set("nf_dir", orden.direccion); store.set("nf_ref", orden.ref); }
     mine.unshift({id:ref.id, t:Date.now()}); mine = mine.slice(0,10); saveMine();
     data[ref.id] = {id:ref.id, ...orden, creado:null};
     cart = []; ubic = null; compData = ""; showStatus(ref.id);
@@ -501,7 +511,7 @@ function renderStatus(p){
     <p class="lbl">Tu número</p><div class="num">${esc(p.numero)}</div><p class="who">${esc(p.nombre)}</p>
     ${big}
     <ol class="steps">${pasos.map((s,k)=>`<li class="${k<idx?"pas":k===idx?"now":""}">${s[1]}</li>`).join("")}</ol>
-    <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)} (${esc(it.tam)})</div>`).join("")}${p.modo==="domicilio"?`<div style="margin-top:6px"><b>Total: ${money(p.total||0)}</b> + envío · ${esc(p.pago)}</div>`:""}</div>
+    <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)} (${esc(it.tam)})</div>`).join("")}${p.modo==="domicilio"?`<div style="margin-top:6px"><b>Total: ${money(p.total||0)}</b> · ${esc(p.pago)}</div>`:""}</div>
     ${p.modo==="domicilio" && p.pago==="Transferencia" && p.estado!=="entregado" ? (p.comprobante ? `<p class="note" style="margin-top:12px">🧾 Comprobante recibido ✓</p>` : `<div style="margin-top:14px">${transferInfo()}<label class="primary" for="compLater" style="margin-top:10px">🧾 Subir comprobante</label><input type="file" id="compLater" data-order="${p.id}" accept="image/*" hidden><p class="note" id="compMsg"></p></div>`) : ""}
     ${p.estado==="entregado"&&p.modo==="evento"?`<button class="primary" id="backBtn">Pedir otra bebida</button>`:`<button class="ghost" id="backBtn">Ver el menú</button>`}
     ${p.modo==="evento"&&p.estado!=="entregado"?`<p class="note" style="margin-top:12px">Si cierras la página, tu pedido sigue guardado en "Mis pedidos".</p>`:""}
@@ -534,11 +544,17 @@ document.addEventListener("click", e=>{
   else if(t.dataset.rm){ cart.splice(+t.dataset.rm,1); cart.length?openCart():(closeSheet(),renderCart()); }
   else if(t.id==="openCart" || t.id==="openCart2") openCart();
   else if(t.id==="geoBtn") askLocation(t);
+  else if(t.dataset.copy){ const v = t.dataset.copy; (navigator.clipboard?.writeText(v) || Promise.reject()).then(()=>{ t.textContent = "Copiada ✓"; }).catch(()=>{ t.textContent = "Mantén presionado el número para copiar"; }); }
   else if(t.id==="sendBtn") send();
 });
+document.addEventListener("input", e=>{ const k = {nombre:"nf_nombre",tel:"nf_tel",lugar:"nf_dir",ref:"nf_ref"}[e.target.id]; if(k) store.set(k, e.target.value); });
 document.addEventListener("change", async e=>{
   const t = e.target;
-  if(t.name==="pago"){ const box = $("#transfBox"); if(box) box.hidden = t.value!=="Transferencia"; }
+  if(t.name==="pago"){
+    const box = $("#transfBox"); if(box) box.hidden = t.value!=="Transferencia";
+    const n = $("#pagoNote"); if(n) n.textContent = t.value==="Transferencia" ? "Transfiere el total y sube tu comprobante. Preparamos tu pedido en cuanto confirmamos el pago."
+      : t.value==="Tarjeta al recibir" ? "El repartidor lleva terminal para cobrarte con tarjeta al entregar." : "Pagas en efectivo al recibir tu pedido.";
+  }
   if(t.id==="compFile" && t.files[0]){
     const lbl = document.querySelector('label[for="compFile"]'); lbl.textContent = "🧾 Procesando foto…";
     try{ compData = await compressImage(t.files[0]); lbl.textContent = "🧾 Comprobante listo ✓ (toca para cambiar)"; }
