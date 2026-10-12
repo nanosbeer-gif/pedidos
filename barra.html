@@ -174,6 +174,18 @@ body.tv .top{display:none}
 .ord:has(.tagbad){opacity:.75}
 .go[disabled]{opacity:.45;cursor:not-allowed}
 .evc.cerr{opacity:.85;border-style:dashed}
+.tents{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.tents figure{margin:0;text-align:center}
+.tents img{width:100%;border-radius:8px;border:1px solid var(--line);aspect-ratio:2550/3300;background:#fff}
+.tents figcaption{font-weight:800;margin-top:6px}
+.fis{display:grid;gap:6px}.fis small{color:var(--muted);font-weight:600}
+.fisg{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:4px}
+.evf .fx{display:flex!important;align-items:center;gap:8px;background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;font-size:14px!important}
+.evf .fx input{width:20px!important;height:20px;padding:0!important;flex:none;accent-color:var(--neon)}
+.fx:has(input:checked){border-color:var(--neon);color:var(--neon)}
+.fx.oc{opacity:.5;cursor:not-allowed}.fx span small{display:block;font-size:11px;color:var(--pink)}
+.fisest{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:6px}
+.fisest div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}.fisest span{display:block;color:var(--muted);font-size:13px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -291,6 +303,11 @@ let accion = null; // {id, tipo:"cancel"|"reemb"}
 
 function go(s){ knownListos = null; sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
 let cerrados = null;
+const FISICAS = 7; // número de barras físicas (cambia aquí si compras más)
+let asign = {}; // {"3": {e:"EVID", b:1}}
+function bName(e, k){ return e && e.fisicas && e.fisicas[k-1] ? "Barra "+e.fisicas[k-1] : "Barra "+k; }
+async function guardarAsign(nuevo){ asign = nuevo; await setDoc(doc(db,"config","barras"), {asign: nuevo}); }
+function asignSin(evId){ const n = {...asign}; for(const k in n) if(n[k].e===evId) delete n[k]; return n; }
 function ev(id){ return eventos.find(e=>e.id===id) || (cerrados||[]).find(e=>e.id===id); }
 async function cargarCerrados(){
   try{
@@ -353,24 +370,24 @@ function render(){
   if(["cola","qr","resumen","pantalla"].includes(v) && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
   const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id] = i.type==="checkbox" ? {c:i.checked} : i.value; });
   const focused = document.activeElement?.id;
-  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : "";
+  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : v==="fijos" ? fijosView() : "";
   if(freshForm){ freshForm = false; for(const k in keep) if(/^h/.test(k)) delete keep[k]; }
   Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(!i) return; if(val && typeof val==="object") i.checked = val.c; else i.value = val; });
   if(focused){ const f=document.getElementById(focused); if(f && f.matches("input,select")) f.focus(); }
-  if(v==="qr") drawQRs();
+  if(v==="qr" || v==="fijos"){ drawQRs(); drawTents(); }
 }
 
 function homeView(){
   const cards = eventos.map(e=>`
     <article class="evc">
-      <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.barras} ${e.barras>1?"barras":"barra"} · ${({fizz:"Fizz",beer:"Beer 🍺",ambos:"Fizz + Beer 🍺"})[e.marca||"fizz"]}</small></div>
+      <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.fisicas?(e.fisicas.length>1?"Barras ":"Barra ")+e.fisicas.join(", "):e.barras+" "+(e.barras>1?"barras":"barra")} · ${({fizz:"Fizz",beer:"Beer 🍺",ambos:"Fizz + Beer 🍺"})[e.marca||"fizz"]}</small></div>
       <div class="evb">
-        ${Array.from({length:e.barras},(_,k)=>`<button class="go" data-cola="${e.id}" data-b="${e.barras>1?k+1:0}">${e.barras>1?"Barra "+(k+1):"Abrir pedidos"}</button>`).join("")}
+        ${Array.from({length:e.barras},(_,k)=>`<button class="go" data-cola="${e.id}" data-b="${e.barras>1?k+1:0}">${e.barras>1?bName(e,k+1):"Abrir pedidos"}</button>`).join("")}
         ${e.barras>1?`<button class="sec" data-cola="${e.id}" data-b="0">Todas las barras</button>`:""}
       </div>
       <div class="evb">
         <button class="sec" data-qr="${e.id}">Ver QR</button>
-        ${Array.from({length:e.barras},(_,k)=>`<button class="sec" data-pant="${e.id}" data-b="${e.barras>1?k+1:0}">📺 Pantalla${e.barras>1?" barra "+(k+1):" de listos"}</button>`).join("")}
+        ${Array.from({length:e.barras},(_,k)=>`<button class="sec" data-pant="${e.id}" data-b="${e.barras>1?k+1:0}">📺 Pantalla${e.barras>1?" "+bName(e,k+1).toLowerCase():" de listos"}</button>`).join("")}
         <button class="sec" data-res="${e.id}">Resumen</button>
       </div>
     </article>`).join("");
@@ -393,7 +410,9 @@ function homeView(){
         <label for="evNombre">Nombre del evento<input id="evNombre" maxlength="50" required placeholder="Ej. XV años de Ana"></label>
         <div class="row2">
           <label for="evPersonas">Personas<input id="evPersonas" type="number" min="1" max="2000" required inputmode="numeric" placeholder="150"></label>
-          <label for="evBarras">Barras<select id="evBarras"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        </div>
+        <div class="fis"><b>¿Qué barras llevas a este evento?</b><small>Sus QR fijos quedarán apuntando a este evento.</small>
+          <div class="fisg">${Array.from({length:FISICAS},(_,i)=>{ const n = i+1, oc = asign[n] && eventos.some(x=>x.id===asign[n].e); return `<label class="fx${oc?" oc":""}" for="fis${n}"><input type="checkbox" id="fis${n}" value="${n}" ${oc?"disabled":""}><span>Barra ${n}${oc?`<small>${esc(ev(asign[n].e)?.nombre||"ocupada")}</small>`:""}</span></label>`; }).join("")}</div>
         </div>
         <label for="evMarca">Menú del evento<select id="evMarca"><option value="fizz">Nano's Fizz (sin alcohol)</option><option value="beer">Nano's Beer (con alcohol)</option><option value="ambos">Ambos menús</option></select></label>
         <button class="go" type="submit" id="evBtn">Crear evento</button>
@@ -406,6 +425,9 @@ function homeView(){
       <div class="evb"><button class="go dom" data-cola="domicilio" data-b="0">Pedidos a domicilio</button></div>
     </section>
     <section class="blk">
+      <h2>QR fijos de las barras</h2>
+      <p class="hint" style="margin:0 0 8px">Imprímelos una sola vez. Cada QR abre el evento al que asignes esa barra.</p>
+      <div class="evb" style="margin-bottom:18px"><button class="sec" data-view="fijos">🔳 Ver e imprimir QR fijos</button></div>
       <h2>Menú y horario</h2>
       <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button><button class="sec" data-view="historial">📥 Descargar y vaciar pedidos</button></div>
     </section>`;
@@ -497,6 +519,7 @@ const NFM = window.NF_MENU;
 let agotados = {}, tienda = null, menuMarca = "fizz", freshForm = false;
 function listenConfig(){
   onSnapshot(doc(db,"config","menu"), s=>{ agotados = (s.exists() && s.data().agotados) || {}; if(["menu","home"].includes(sel.view)) render(); }, ()=>{});
+  onSnapshot(doc(db,"config","barras"), s=>{ asign = (s.exists() && s.data().asign) || {}; if(["home","fijos"].includes(sel.view)) render(); }, ()=>{});
   onSnapshot(doc(db,"config","tienda"), s=>{ tienda = s.exists() ? s.data() : null; if(["horario","home"].includes(sel.view)){ freshForm = true; render(); } }, ()=>{});
 }
 async function setAgotado(key, val){
@@ -561,7 +584,7 @@ function colaView(){
   if(tab==="entregado" || tab==="cancelado") list = list.slice().reverse().slice(0,40);
   return `
     <div class="crumb"><button class="sec" data-home>← Eventos</button>
-      <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">Barra ${sel.barra}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
+      <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">${bName(e,sel.barra)}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
     ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
@@ -569,7 +592,7 @@ function colaView(){
 function card(p){
   return `<article class="ord ${p.modo}">
     <header><div class="n">${esc(p.numero)}</div>
-      <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`Barra ${p.barra} · `:"")}${ago(p.creado)}</small></div></header>
+      <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
     <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
       ${(it.opciones||[]).includes("🚫 SIN ALCOHOL")?`<div class="sinalc">🚫 SIN ALCOHOL</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
@@ -602,11 +625,25 @@ function accionForm(p){
   </div>`;
 }
 
+function fijosView(){
+  return `<div class="crumb"><button class="sec" data-home>← Inicio</button><div><b>QR fijos de las barras</b></div></div>
+    <p class="hint">Cada barra física tiene su QR para siempre. Imprímelos y enmícalos. Cuando creas un evento y eliges sus barras, estos QR abren ese evento. Si una barra no está en ningún evento, el QR avisa que no hay evento activo.</p>
+    <div class="fisest">${Array.from({length:FISICAS},(_,i)=>{ const n=i+1, a=asign[n], e=a&&ev(a.e); return `<div><b>Barra ${n}</b><span>${e?"→ "+esc(e.nombre):"Libre"}</span></div>`; }).join("")}</div>
+    <h2>Cartel de barra</h2>
+    <div class="qrs">${Array.from({length:FISICAS},(_,i)=>`<figure><canvas class="qrc" data-b="1" data-url="${BASE}?f=${i+1}" data-nombre="Barra ${i+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-url="${BASE}?f=${i+1}" alt="QR barra ${i+1}"><figcaption>Barra ${i+1}</figcaption></figure>`).join("")}</div>
+    <h2>🔺 Tarjetas para mesas</h2>
+    <p class="hint">Imprime en cartulina carta al 100%, recorta, dobla en las líneas rosas y pega la pestaña bajo la base.</p>
+    <div class="tents">${Array.from({length:FISICAS},(_,i)=>`<figure><canvas class="tentc" data-b="1" data-url="${BASE}?f=${i+1}" data-nombre="Barra ${i+1}" width="2550" height="3300" hidden></canvas><img class="tenti" data-url="${BASE}?f=${i+1}" alt="Tarjeta barra ${i+1}"><figcaption>Tarjeta · Barra ${i+1}</figcaption></figure>`).join("")}</div>`;
+}
+const FIJO_EV = {id:null, nombre:"", barras:1, marca:"ambos"};
 function qrView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
   return `<div class="crumb"><button class="sec" data-home>← Eventos</button><div><b>QR · ${esc(e.nombre)}</b></div></div>
     <p class="hint">Mantén presionada la imagen y elige <b>Guardar imagen</b> para imprimirla.${e.barras>1?" Cada barra tiene su propio QR: ponlo solo cerca de esa barra.":""}</p>
-    <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}" alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?"Barra "+(k+1):"QR del evento"}</figcaption><a class="sec lnk" href="${BASE}?e=${e.id}${e.barras>1?"&b="+(k+1):""}" target="_blank" rel="noopener">Abrir como invitado</a></figure>`).join("")}</div>`;
+    <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}" alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?bName(e,k+1):"QR del evento"}</figcaption><a class="sec lnk" href="${BASE}?e=${e.id}${e.barras>1?"&b="+(k+1):""}" target="_blank" rel="noopener">Abrir como invitado</a></figure>`).join("")}</div>
+    <h2>🔺 Tarjeta para mesas</h2>
+    <p class="hint">Hoja tamaño carta para imprimir y doblar en triángulo: de un lado el QR y del otro las instrucciones. Mantén presionada la imagen → <b>Guardar imagen</b>, imprímela en <b>cartulina carta al 100%</b>, recorta por la orilla, dobla en las líneas punteadas y pega la pestaña bajo la base.${e.barras>1?" Hay una por barra: pon en cada mesa la de la barra más cercana.":""}</p>
+    <div class="tents">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="tentc" data-b="${k+1}" width="2550" height="3300" hidden></canvas><img class="tenti" data-b="${k+1}" alt="Tarjeta de mesa"><figcaption>${e.barras>1?"Tarjeta · "+bName(e,k+1):"Tarjeta de mesa"}</figcaption></figure>`).join("")}</div>`;
 }
 function pantallaView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
@@ -615,7 +652,7 @@ function pantallaView(){
   const prep = mine.filter(p=>p.estado==="preparando" || p.estado==="nuevo");
   const tag = p => `<div class="tvn"><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
   return `<div class="tvwrap">
-    <header class="tvh"><img src="logo.png" alt=""><div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>Barra ${sel.barra}</p>`:""}</div>
+    <header class="tvh"><img src="logo.png" alt=""><div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>${bName(e,sel.barra)}</p>`:""}</div>
       <button class="sec tvx" data-salirtv>Salir</button></header>
     <div class="tvcols">
       <section class="tvlist"><h2>🥤 ¡Listas! Pasa por tu bebida</h2><div class="tvgrid big">${listos.length?listos.map(tag).join(""):`<p class="tvempty">Aquí aparecen los números listos</p>`}</div></section>
@@ -641,7 +678,7 @@ function resumenView(){
       <div><span>${e.personas?(beb/e.personas).toFixed(1):"–"}</span>Bebidas por persona</div>
       <div><span>${pend}</span>Pendientes</div>${canc?`<div><span>${canc}</span>Cancelados</div>`:""}
     </div>
-    ${e.barras>1?`<h2>Por barra</h2><div class="bars">${porB.map((n,k)=>`<div>Barra ${k+1}<b>${n}</b></div>`).join("")}</div>`:""}
+    ${e.barras>1?`<h2>Por barra</h2><div class="bars">${porB.map((n,k)=>`<div>${bName(e,k+1)}<b>${n}</b></div>`).join("")}</div>`:""}
     <h2>Más pedidas</h2>
     <div class="top">${topList.length?topList.map(([n,c])=>`<div><span>${esc(n)}</span><b>${c}</b></div>`).join(""):`<p class="empty">Aún no hay pedidos_.</p>`}</div>
     <div class="blk">
@@ -656,9 +693,9 @@ function resumenView(){
 // ===== Tarjeta QR (canvas) =====
 const logoImg = new Image(); logoImg.src = "logo.png";
 function drawQRs(){
-  const e = ev(sel.evento); if(!e || !window.qrcode) return;
+  const e = sel.view==="fijos" ? FIJO_EV : ev(sel.evento); if(!e || !window.qrcode) return;
   document.querySelectorAll(".qrc").forEach(cv=>{
-    const b = +cv.dataset.b, url = `${BASE}?e=${e.id}${e.barras>1?"&b="+b:""}`;
+    const b = +cv.dataset.b, url = cv.dataset.url || `${BASE}?e=${e.id}${e.barras>1?"&b="+b:""}`, en = cv.dataset.nombre || e.nombre, bl = bName(e,b);
     const draw = ()=>{
       const c = cv.getContext ? cv.getContext("2d") : null, W=1200, H=1800; if(!c) return;
       const g = c.createRadialGradient(W/2,0,50,W/2,0,900); g.addColorStop(0,"#3a1d7a"); g.addColorStop(1,"#140a2e");
@@ -667,8 +704,8 @@ function drawQRs(){
       c.textAlign = "center"; c.fillStyle = "#7dff3a"; c.font = "800 80px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
       c.fillText("¡Pide tu bebida!", W/2, 410);
       c.fillStyle = "#f3edff"; c.font = "700 46px Nunito, sans-serif";
-      fitText(c, e.nombre, W/2, 480, 1040);
-      if(e.barras>1){ c.fillStyle = "#ff4fb8"; c.font = "800 44px Nunito, sans-serif"; c.fillText("BARRA "+b, W/2, 545); }
+      fitText(c, en, W/2, 480, 1040);
+      if(e.barras>1){ c.fillStyle = "#ff4fb8"; c.font = "800 44px Nunito, sans-serif"; c.fillText(bl.toUpperCase(), W/2, 545); }
       const q = qrcode(0,"H"); q.addData(url); q.make();
       const n = q.getModuleCount(), size = 700, cell = size/n, x0 = (W-size)/2, y0 = 600;
       c.fillStyle = "#fff"; roundRect(c, x0-36, y0-36, size+72, size+72, 40); c.fill();
@@ -684,12 +721,85 @@ function drawQRs(){
         c.fillStyle = "#140a2e"; c.textAlign = "center"; c.fillText(String(i+1), 185, y);
         c.fillStyle = "#f3edff"; c.textAlign = "left"; c.fillText(t, 240, y);
       });
-      const img = document.querySelector(`.qri[data-b="${b}"]`); if(img) img.src = cv.toDataURL("image/png");
+      const img = document.querySelector(cv.dataset.url?`.qri[data-url="${cv.dataset.url}"]`:`.qri[data-b="${b}"]`); if(img) img.src = cv.toDataURL("image/png");
     };
     document.fonts?.ready ? document.fonts.ready.then(draw) : draw();
     if(!logoImg.complete) logoImg.onload = ()=>drawQRs();
   });
 }
+const beerImg = new Image(); beerImg.src = "logo-beer.png";
+function drawTents(){
+  const e = sel.view==="fijos" ? FIJO_EV : ev(sel.evento); if(!e || !window.qrcode) return;
+  const ready = ()=> logoImg.complete && logoImg.naturalWidth && beerImg.complete && beerImg.naturalWidth;
+  if(!ready()){ logoImg.addEventListener("load", drawTents, {once:true}); beerImg.addEventListener("load", drawTents, {once:true}); return; }
+  const marca = e.marca || "fizz", logos = marca==="ambos" ? [logoImg, beerImg] : marca==="beer" ? [beerImg] : [logoImg];
+  document.querySelectorAll(".tentc").forEach(cv=>{
+    const b = +cv.dataset.b, url = cv.dataset.url || `${BASE}?e=${e.id}${e.barras>1?"&b="+b:""}`, en = cv.dataset.nombre || e.nombre, bl = bName(e,b);
+    const draw = ()=>{
+      const c = cv.getContext ? cv.getContext("2d") : null; if(!c) return;
+      const W = 2550, H = 3300, M = 125, FW = W - 2*M, FH = 960, TAB = 240;
+      const yA = M, yB = yA + FH, yC = yB + FH, yT = yC + FH;
+      c.fillStyle = "#fff"; c.fillRect(0,0,W,H);
+      // fondos de cada cara
+      const face = (y)=>{ const g = c.createLinearGradient(0,y,0,y+FH); g.addColorStop(0,"#2a1460"); g.addColorStop(1,"#140a2e"); c.fillStyle = g; c.fillRect(M,y,FW,FH); };
+      face(yA); face(yB);
+      c.fillStyle = "#1b0e3d"; c.fillRect(M,yC,FW,FH);
+      c.fillStyle = "#e9e3f7"; c.fillRect(M,yT,FW,TAB);
+      // ---- Cara B: QR (derecha)
+      c.save(); c.translate(M, yB);
+      const q = qrcode(0,"H"); q.addData(url); q.make();
+      const n = q.getModuleCount(), qs = 760, cell = qs/n, qx = FW - qs - 110, qy = (FH - qs)/2;
+      c.fillStyle = "#fff"; roundRect(c, qx-30, qy-30, qs+60, qs+60, 36); c.fill(); c.lineWidth = 10; c.strokeStyle = "#ff4fb8"; c.stroke();
+      c.fillStyle = "#140a2e";
+      for(let r=0;r<n;r++) for(let k=0;k<n;k++) if(q.isDark(r,k)) c.fillRect(Math.floor(qx+k*cell), Math.floor(qy+r*cell), Math.ceil(cell), Math.ceil(cell));
+      const lc = 120; c.fillStyle = "#fff"; c.beginPath(); c.arc(qx+qs/2, qy+qs/2, lc/2+8, 0, 7); c.fill();
+      c.drawImage(logos[0], qx+qs/2-lc/2, qy+qs/2-lc/2, lc, lc);
+      const lx = 110; let lgx = lx;
+      logos.forEach(im=>{ c.drawImage(im, lgx, 90, 230, 230); lgx += 250; });
+      c.textAlign = "left"; c.fillStyle = "#7dff3a"; c.font = "400 118px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
+      c.fillText("¡Pide tu bebida", lx, 450); c.fillText("desde tu cel!", lx, 575);
+      c.fillStyle = "#f3edff"; c.font = "800 58px Nunito, sans-serif"; c.fillText("Escanea el código con tu cámara", lx, 690);
+      c.fillStyle = "#ffc53d"; c.font = "800 52px Nunito, sans-serif"; fitTextW(c, en + (e.barras>1 ? "  ·  "+bl : ""), lx, 800, qx - lx - 80);
+      c.restore();
+      // ---- Cara A: instrucciones (de cabeza para que quede derecha al doblar)
+      c.save(); c.translate(M+FW, yA+FH); c.rotate(Math.PI);
+      c.textAlign = "left"; c.fillStyle = "#7dff3a"; c.font = "400 100px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
+      c.fillText("¿Cómo pido mi bebida?", 110, 175);
+      const pasos = [["Escanea el QR","con la cámara de tu celular (está del otro lado)"],["Elige tu bebida","y escribe tu nombre"],["Espera tu número","te avisamos en tu cel y en la pantalla de la barra"],["Pasa a la barra","di tu número y ¡disfruta!"]];
+      const colW = (FW - 220) / 4;
+      pasos.forEach(([t,d],i)=>{
+        const x = 110 + i*colW, cx = x + 70;
+        c.fillStyle = "#ff4fb8"; c.beginPath(); c.arc(cx, 330, 70, 0, 7); c.fill();
+        c.fillStyle = "#fff"; c.textAlign = "center"; c.font = "400 92px 'Lilita One', sans-serif"; c.fillText(String(i+1), cx, 362);
+        c.textAlign = "left"; c.fillStyle = "#f3edff"; c.font = "800 54px Nunito, sans-serif"; wrap(c, t, x, 480, colW - 40, 62);
+        c.fillStyle = "#b9a9e6"; c.font = "700 40px Nunito, sans-serif"; wrap(c, d, x, 560, colW - 50, 50);
+      });
+      c.fillStyle = "#ffc53d"; c.font = "800 44px Nunito, sans-serif"; c.textAlign = "center";
+      c.fillText("Una bebida a la vez · No cierres la página mientras esperas" + (marca!=="fizz" ? " · Alcohol solo +18" : ""), FW/2, FH - 70);
+      c.restore();
+      // ---- Base: logos
+      c.save(); c.translate(M, yC); let bx = FW/2 - (logos.length*300 - 40)/2;
+      logos.forEach(im=>{ c.globalAlpha = .9; c.drawImage(im, bx, (FH-260)/2, 260, 260); bx += 300; }); c.globalAlpha = 1;
+      c.fillStyle = "#b9a9e6"; c.font = "800 44px Nunito, sans-serif"; c.textAlign = "center"; c.fillText("BASE", FW/2, FH - 60); c.restore();
+      // ---- Pestaña
+      c.fillStyle = "#6b5aa0"; c.font = "800 44px Nunito, sans-serif"; c.textAlign = "center"; c.fillText("PEGAR AQUÍ (debajo de la base)", W/2, yT + TAB/2 + 16);
+      // ---- Líneas de doblez y corte
+      c.setLineDash([28,20]); c.lineWidth = 6; c.strokeStyle = "#ff4fb8";
+      [yB, yC, yT].forEach(y=>{ c.beginPath(); c.moveTo(M-60,y); c.lineTo(W-M+60,y); c.stroke(); });
+      c.setLineDash([]); c.lineWidth = 3; c.strokeStyle = "#999"; c.strokeRect(M, yA, FW, 3*FH + TAB);
+      c.fillStyle = "#888"; c.font = "700 36px Nunito, sans-serif"; c.textAlign = "left";
+      c.fillText("✂ Recorta por la orilla gris  ·  Dobla en las líneas rosas punteadas", M, H - 50);
+      const img = document.querySelector(cv.dataset.url?`.tenti[data-url="${cv.dataset.url}"]`:`.tenti[data-b="${b}"]`); if(img) img.src = cv.toDataURL("image/png");
+    };
+    document.fonts?.ready ? document.fonts.ready.then(draw) : draw();
+  });
+}
+function wrap(c, text, x, y, max, lh){
+  const words = String(text).split(" "); let line = "";
+  for(const w of words){ const t = line ? line+" "+w : w; if(c.measureText(t).width > max && line){ c.fillText(line, x, y); y += lh; line = w; } else line = t; }
+  if(line) c.fillText(line, x, y);
+}
+function fitTextW(c, t, x, y, max){ let size = parseInt(c.font.match(/(\d+)px/)[1],10); while(c.measureText(t).width > max && size > 28){ size -= 2; c.font = c.font.replace(/\d+px/, size+"px"); } c.fillText(t, x, y); }
 function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function fitText(c,t,x,y,max){ let s = 46; while(c.measureText(t).width > max && s > 24){ s -= 2; c.font = `700 ${s}px Nunito, sans-serif`; } c.fillText(t,x,y); }
 
@@ -725,12 +835,15 @@ document.addEventListener("submit", async e=>{
   }
   if(e.target.id!=="evForm") return;
   e.preventDefault();
-  const nombre = $("#evNombre").value.trim(), personas = parseInt($("#evPersonas").value,10), barras = parseInt($("#evBarras").value,10), marca = $("#evMarca").value;
+  const nombre = $("#evNombre").value.trim(), personas = parseInt($("#evPersonas").value,10), marca = $("#evMarca").value;
+  const fisicas = [...document.querySelectorAll('.fisg input:checked')].map(x=>+x.value), barras = Math.max(1, fisicas.length);
+  if(!fisicas.length){ $("#evErr").textContent = "Elige al menos una barra."; return; }
   if(!nombre || !(personas>0)){ $("#evErr").textContent = "Pon el nombre y el número de personas."; return; }
   $("#evBtn").disabled = true;
   try{
-    const ref = await addDoc(collection(db,"eventos"), {nombre, personas, barras, marca, estado:"activo", creado: serverTimestamp()});
-    if(!ev(ref.id)) eventos.unshift({id:ref.id, nombre, personas, barras, marca, estado:"activo", creado:null});
+    const ref = await addDoc(collection(db,"eventos"), {nombre, personas, barras, fisicas, marca, estado:"activo", creado: serverTimestamp()});
+    const na = {...asign}; fisicas.forEach((n,i)=>{ na[n] = {e: ref.id, b: i+1}; }); await guardarAsign(na);
+    if(!ev(ref.id)) eventos.unshift({id:ref.id, nombre, personas, barras, fisicas, marca, estado:"activo", creado:null});
     go({view:"qr", evento: ref.id});
   }catch{ $("#evErr").textContent = "No se pudo crear. Revisa el internet."; $("#evBtn").disabled = false; }
 });
@@ -778,14 +891,17 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.vercerr!==undefined){ t.disabled = true; t.textContent = "Cargando…"; cargarCerrados(); }
   else if(t.dataset.reabrir){
     t.disabled = true;
-    try{ await updateDoc(doc(db,"eventos",t.dataset.reabrir), {estado:"activo"}); if(cerrados) cerrados = cerrados.filter(e=>e.id!==t.dataset.reabrir); go({view:"home"}); }
+    try{ await updateDoc(doc(db,"eventos",t.dataset.reabrir), {estado:"activo"});
+      const re = ev(t.dataset.reabrir), na = {...asign}, choque = [];
+      (re?.fisicas||[]).forEach((n,i)=>{ if(na[n] && na[n].e!==re.id && eventos.some(x=>x.id===na[n].e)) choque.push(n); else na[n] = {e: re.id, b: i+1}; });
+      await guardarAsign(na); if(choque.length) alert("Ojo: la barra "+choque.join(", ")+" ya está en otro evento activo. Su QR fijo sigue apuntando a ese otro evento."); if(cerrados) cerrados = cerrados.filter(e=>e.id!==t.dataset.reabrir); go({view:"home"}); }
     catch{ t.disabled = false; }
   }
   else if(t.dataset.precerrar){ cerrando = t.dataset.precerrar; render(); }
   else if(t.dataset.nocerrar!==undefined){ cerrando = null; render(); }
   else if(t.dataset.cerrar){
     t.disabled = true;
-    try{ await updateDoc(doc(db,"eventos",t.dataset.cerrar), {estado:"cerrado"}); cerrando = null; if(cerrados){ const e = eventos.find(x=>x.id===t.dataset.cerrar); if(e) cerrados.unshift({...e, estado:"cerrado"}); } go({view:"home"}); }
+    try{ await updateDoc(doc(db,"eventos",t.dataset.cerrar), {estado:"cerrado"}); await guardarAsign(asignSin(t.dataset.cerrar)); cerrando = null; if(cerrados){ const e = eventos.find(x=>x.id===t.dataset.cerrar); if(e) cerrados.unshift({...e, estado:"cerrado"}); } go({view:"home"}); }
     catch{ t.disabled = false; }
   }
   else if(t.dataset.to){

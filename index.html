@@ -186,7 +186,12 @@ const TRANSFER = { banco:"Plata", titular:"Adrián Sánchez González", clabe:"6
 
 let cat = "todas", cart = [], pendingBeep = false;
 const QS = new URLSearchParams(location.search);
-const E = QS.get("e") || "", BARRA = Math.max(1, Math.min(9, parseInt(QS.get("b")||"1",10)||1));
+let E = QS.get("e") || "", BARRA = Math.max(1, Math.min(9, parseInt(QS.get("b")||"1",10)||1));
+const F = QS.get("f"); let sinEvento = false;
+if(F && !E){
+  try{ const sa = await getDoc(doc(db,"config","barras")); const a = sa.exists() && sa.data().asign && sa.data().asign[F]; if(a){ E = a.e; BARRA = a.b; } else { E = "__sin_evento__"; sinEvento = true; } }
+  catch{ E = "__sin_evento__"; sinEvento = true; }
+}
 let mode = E ? "evento" : "domicilio", evento = null, eventoOk = !E;
 const $ = s => document.querySelector(s);
 const money = n => "$" + n.toLocaleString("es-MX");
@@ -234,8 +239,9 @@ function listenConfig(){
 setInterval(()=>{ if(!E) setModeUI(); }, 60000);
 function setModeUI(){
   if(mode==="evento"){
-    $("#evName").textContent = evento ? evento.nombre : "Cargando evento…";
-    $("#modeNote").textContent = !E ? "" : (evento && evento.estado!=="activo") || (evento===false)
+    $("#evName").textContent = sinEvento ? "Sin evento activo" : evento ? evento.nombre : evento===false ? "Evento terminado" : "Cargando evento…";
+    $("#modeNote").textContent = sinEvento ? "Esta barra todavía no tiene un evento activo. Pregunta en la barra o intenta en unos minutos."
+      : !E ? "" : (evento && evento.estado!=="activo") || (evento===false)
       ? "Este evento ya terminó y no recibe pedidos. ¡Gracias por venir!"
       : "Tus bebidas ya están incluidas en el evento. Pide aquí y te avisamos en esta pantalla cuando esté lista para que pases a la barra.";
   }else{
@@ -248,6 +254,7 @@ function setModeUI(){
 }
 async function loadEvento(){
   if(!E) return;
+  if(sinEvento){ evento = false; eventoOk = false; setModeUI(); renderBrand(); renderMenu(); return; }
   try{
     const snap = await getDoc(doc(db,"eventos",E));
     evento = snap.exists() ? {id:snap.id, ...snap.data()} : false;
@@ -572,8 +579,8 @@ function backToMenu(){
   $("#status").hidden = true; $("#menuWrap").hidden = false; renderCart(); scrollTo(0,0);
 }
 function closedSheet(){
-  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>${evento===null?"Un momento…":"Este evento ya cerró"}</h3>
-    <p class="desc" style="font-size:14.5px;margin-top:8px">${evento===null?"Estamos cargando el evento, intenta de nuevo en unos segundos.":"Ya no se reciben pedidos para este evento. ¡Gracias por venir!"}</p>`);
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>${sinEvento?"Aún no hay evento":evento===null?"Un momento…":"Este evento ya cerró"}</h3>
+    <p class="desc" style="font-size:14.5px;margin-top:8px">${sinEvento?"Esta barra todavía no tiene un evento activo. Pregunta en la barra.":evento===null?"Estamos cargando el evento, intenta de nuevo en unos segundos.":"Ya no se reciben pedidos para este evento. ¡Gracias por venir!"}</p>`);
 }
 function lockSheet(p){
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Ya tienes una bebida pedida</h3>
