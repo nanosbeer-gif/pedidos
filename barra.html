@@ -639,11 +639,11 @@ const FIJO_EV = {id:null, nombre:"", barras:1, marca:"ambos"};
 function qrView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
   return `<div class="crumb"><button class="sec" data-home>← Eventos</button><div><b>QR · ${esc(e.nombre)}</b></div></div>
-    <p class="hint">Mantén presionada la imagen y elige <b>Guardar imagen</b> para imprimirla.${e.barras>1?" Cada barra tiene su propio QR: ponlo solo cerca de esa barra.":""}</p>
-    <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}" width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}" alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?bName(e,k+1):"QR del evento"}</figcaption><a class="sec lnk" href="${BASE}?e=${e.id}${e.barras>1?"&b="+(k+1):""}" target="_blank" rel="noopener">Abrir como invitado</a></figure>`).join("")}</div>
+    ${e.fisicas?`<p class="hint">Estos son los <b>QR fijos</b> de ${e.fisicas.length>1?"las barras":"la barra"} ${e.fisicas.join(", ")}: los mismos de siempre, no traen el nombre del evento. Si ya los tienes impresos, no necesitas imprimir nada: ya apuntan a este evento.</p>`:`<p class="hint">Mantén presionada la imagen y elige <b>Guardar imagen</b> para imprimirla.${e.barras>1?" Cada barra tiene su propio QR: ponlo solo cerca de esa barra.":""}</p>`}
+    <div class="qrs">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="qrc" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}" data-nombre="Barra ${e.fisicas[k]}" data-marca="ambos"`:""} width="1200" height="1800" hidden></canvas><img class="qri" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}"`:""} alt="QR ${e.barras>1?"barra "+(k+1):""}"><figcaption>${e.barras>1?bName(e,k+1):"QR del evento"}</figcaption><a class="sec lnk" href="${e.fisicas&&e.fisicas[k]?BASE+"?f="+e.fisicas[k]:BASE+"?e="+e.id+(e.barras>1?"&b="+(k+1):"")}" target="_blank" rel="noopener">Abrir como invitado</a></figure>`).join("")}</div>
     <h2>🔺 Tarjeta para mesas</h2>
     <p class="hint">Hoja tamaño carta para imprimir y doblar en triángulo: de un lado el QR y del otro las instrucciones. Mantén presionada la imagen → <b>Guardar imagen</b>, imprímela en <b>cartulina carta al 100%</b>, recorta por la orilla, dobla en las líneas punteadas y pega la pestaña bajo la base.${e.barras>1?" Hay una por barra: pon en cada mesa la de la barra más cercana.":""}</p>
-    <div class="tents">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="tentc" data-b="${k+1}" width="2550" height="3300" hidden></canvas><img class="tenti" data-b="${k+1}" alt="Tarjeta de mesa"><figcaption>${e.barras>1?"Tarjeta · "+bName(e,k+1):"Tarjeta de mesa"}</figcaption></figure>`).join("")}</div>`;
+    <div class="tents">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="tentc" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}" data-nombre="Barra ${e.fisicas[k]}" data-marca="ambos"`:""} width="2550" height="3300" hidden></canvas><img class="tenti" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}"`:""} alt="Tarjeta de mesa"><figcaption>${e.barras>1?"Tarjeta · "+bName(e,k+1):"Tarjeta de mesa"}</figcaption></figure>`).join("")}</div>`;
 }
 function pantallaView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
@@ -652,7 +652,7 @@ function pantallaView(){
   const prep = mine.filter(p=>p.estado==="preparando" || p.estado==="nuevo");
   const tag = p => `<div class="tvn"><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
   return `<div class="tvwrap">
-    <header class="tvh"><img src="logo.png" alt=""><div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>${bName(e,sel.barra)}</p>`:""}</div>
+    <header class="tvh">${logosDe(e.marca||"fizz").map(im=>`<img src="${im.getAttribute("src")}" alt="">`).join("")}<div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>${bName(e,sel.barra)}</p>`:""}</div>
       <button class="sec tvx" data-salirtv>Salir</button></header>
     <div class="tvcols">
       <section class="tvlist"><h2>🥤 ¡Listas! Pasa por tu bebida</h2><div class="tvgrid big">${listos.length?listos.map(tag).join(""):`<p class="tvempty">Aquí aparecen los números listos</p>`}</div></section>
@@ -692,6 +692,9 @@ function resumenView(){
 
 // ===== Tarjeta QR (canvas) =====
 const logoImg = new Image(); logoImg.src = "logo.png";
+const beerImg = new Image(); beerImg.src = "logo-beer.png";
+function logosDe(marca){ return marca==="ambos" ? [logoImg, beerImg] : marca==="beer" ? [beerImg] : [logoImg]; }
+const imgOk = im => im.complete && im.naturalWidth;
 function drawQRs(){
   const e = sel.view==="fijos" ? FIJO_EV : ev(sel.evento); if(!e || !window.qrcode) return;
   document.querySelectorAll(".qrc").forEach(cv=>{
@@ -700,7 +703,8 @@ function drawQRs(){
       const c = cv.getContext ? cv.getContext("2d") : null, W=1200, H=1800; if(!c) return;
       const g = c.createRadialGradient(W/2,0,50,W/2,0,900); g.addColorStop(0,"#3a1d7a"); g.addColorStop(1,"#140a2e");
       c.fillStyle = g; c.fillRect(0,0,W,H);
-      if(logoImg.complete && logoImg.naturalWidth) c.drawImage(logoImg,(W-260)/2,60,260,260);
+      const lg = logosDe(cv.dataset.marca||e.marca||"fizz"), ls = lg.length>1 ? 230 : 260, lw = lg.length*ls + (lg.length-1)*30;
+      lg.forEach((im,i)=>{ if(imgOk(im)) c.drawImage(im, (W-lw)/2 + i*(ls+30), 60 + (260-ls)/2, ls, ls); });
       c.textAlign = "center"; c.fillStyle = "#7dff3a"; c.font = "800 80px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
       c.fillText("¡Pide tu bebida!", W/2, 410);
       c.fillStyle = "#f3edff"; c.font = "700 46px Nunito, sans-serif";
@@ -713,7 +717,7 @@ function drawQRs(){
       c.fillStyle = "#140a2e";
       for(let r=0;r<n;r++) for(let k=0;k<n;k++) if(q.isDark(r,k)) c.fillRect(Math.floor(x0+k*cell), Math.floor(y0+r*cell), Math.ceil(cell), Math.ceil(cell));
       const lc = 140; c.fillStyle = "#fff"; c.beginPath(); c.arc(W/2, y0+size/2, lc/2+8, 0, 7); c.fill();
-      if(logoImg.complete && logoImg.naturalWidth) c.drawImage(logoImg, W/2-lc/2, y0+size/2-lc/2, lc, lc);
+      if(imgOk(lg[0])) c.drawImage(lg[0], W/2-lc/2, y0+size/2-lc/2, lc, lc);
       c.textAlign = "left"; c.font = "800 42px Nunito, sans-serif";
       ["Escanea con la cámara de tu cel","Te avisamos cuando esté lista","Pasa a la barra con tu número"].forEach((t,i)=>{
         const y = 1430 + i*95;
@@ -724,16 +728,16 @@ function drawQRs(){
       const img = document.querySelector(cv.dataset.url?`.qri[data-url="${cv.dataset.url}"]`:`.qri[data-b="${b}"]`); if(img) img.src = cv.toDataURL("image/png");
     };
     document.fonts?.ready ? document.fonts.ready.then(draw) : draw();
-    if(!logoImg.complete) logoImg.onload = ()=>drawQRs();
+    if(!imgOk(logoImg) || !imgOk(beerImg)){ logoImg.addEventListener("load", drawQRs, {once:true}); beerImg.addEventListener("load", drawQRs, {once:true}); }
   });
 }
-const beerImg = new Image(); beerImg.src = "logo-beer.png";
 function drawTents(){
   const e = sel.view==="fijos" ? FIJO_EV : ev(sel.evento); if(!e || !window.qrcode) return;
   const ready = ()=> logoImg.complete && logoImg.naturalWidth && beerImg.complete && beerImg.naturalWidth;
   if(!ready()){ logoImg.addEventListener("load", drawTents, {once:true}); beerImg.addEventListener("load", drawTents, {once:true}); return; }
-  const marca = e.marca || "fizz", logos = marca==="ambos" ? [logoImg, beerImg] : marca==="beer" ? [beerImg] : [logoImg];
+  
   document.querySelectorAll(".tentc").forEach(cv=>{
+    const marca = cv.dataset.marca || e.marca || "fizz", logos = logosDe(marca);
     const b = +cv.dataset.b, url = cv.dataset.url || `${BASE}?e=${e.id}${e.barras>1?"&b="+b:""}`, en = cv.dataset.nombre || e.nombre, bl = bName(e,b);
     const draw = ()=>{
       const c = cv.getContext ? cv.getContext("2d") : null; if(!c) return;
