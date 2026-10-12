@@ -136,6 +136,11 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 .sa:has(input:checked){border-color:var(--neon);background:#7dff3a14}
 .ready.cancel{background:var(--panel2);color:var(--pink);border:2px solid var(--pink);animation:none}
 .pill.cancelado{color:var(--pink);text-decoration:line-through}
+.cupbox{display:flex;gap:8px;margin-top:10px;align-items:center}
+.cupbox .t{margin-top:0;flex:1;min-width:0;text-transform:uppercase}
+.row.cupok{color:var(--neon)}
+.row.cupok small{color:var(--muted)}
+.cupban{display:block;margin-top:8px;background:#7dff3a1a;border:1.5px solid var(--neon);color:var(--fg);border-radius:12px;padding:8px 10px}
 </style>
 </head>
 <body>
@@ -180,7 +185,19 @@ const curCats = () => ALLCATS.filter(c=>c.marca===marca);
 const marcasEvento = () => !E ? ["fizz"] : (evento && evento.marca==="ambos") ? ["fizz","beer"] : [(evento && evento.marca) || "fizz"];
 const isAgotado = (id, sabor) => !!agotados[sabor ? id+"|"+sabor : id];
 // Envío: $20 con 1 bebida; gratis desde 2 bebidas
-function envio(){ const n = cart.reduce((a,l)=>a+l.qty,0); return n>=2 ? 0 : 20; }
+function envioBase(){ const n = cart.reduce((a,l)=>a+l.qty,0); return n>=2 ? 0 : 20; }
+// ===== Cupones =====
+let cupones = {}, cuponAplicado = "", cuponMsg = "";
+const cuponDe = code => { const c = cupones[String(code||"").toUpperCase()]; return c && c.activo ? c : null; };
+function envio(){ const c = cuponDe(cuponAplicado); return c && c.tipo==="envio" ? 0 : envioBase(); }
+function descuento(){
+  const c = cuponDe(cuponAplicado); if(!c) return 0;
+  if(c.tipo==="pct") return Math.round(cartTotal() * Math.min(100, c.valor||0) / 100);
+  if(c.tipo==="monto") return Math.min(cartTotal(), c.valor||0);
+  if(c.tipo==="envio") return 0;
+  return 0;
+}
+function totalFinal(){ return Math.max(0, cartTotal() + envio() - descuento()); }
 // Datos para transferencia (se muestran al cliente si están llenos)
 const TRANSFER = { banco:"Plata", titular:"Adrián Sánchez González", clabe:"646198405606567407" };
 
@@ -188,6 +205,7 @@ let cat = "todas", cart = [], pendingBeep = false;
 const QS = new URLSearchParams(location.search);
 let E = QS.get("e") || "", BARRA = Math.max(1, Math.min(9, parseInt(QS.get("b")||"1",10)||1));
 const F = QS.get("f"); let sinEvento = false;
+if(QS.get("c")) try{ localStorage.setItem("nf_cupon", QS.get("c").toUpperCase().slice(0,20)); }catch{}
 if(F && !E){
   try{ const sa = await getDoc(doc(db,"config","barras")); const a = sa.exists() && sa.data().asign && sa.data().asign[F]; if(a){ E = a.e; BARRA = a.b; } else { E = "__sin_evento__"; sinEvento = true; } }
   catch{ E = "__sin_evento__"; sinEvento = true; }
@@ -233,6 +251,13 @@ function cerradoSheet(){
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Estamos cerrados</h3><p class="desc" style="font-size:15px;margin-top:8px">${esc(tiendaAbierta().msg||"")} Vuelve a intentarlo en nuestro horario. ¡Te esperamos!</p>`);
 }
 function listenConfig(){
+  if(!E) onSnapshot(doc(db,"config","cupones"), snap=>{
+    cupones = (snap.exists() && snap.data().codigos) || {};
+    const guardado = store.get("nf_cupon");
+    if(!cuponAplicado && guardado && cuponDe(guardado)) cuponAplicado = guardado;
+    if(cuponAplicado && !cuponDe(cuponAplicado)) cuponAplicado = "";
+    renderCart(); setModeUI(); if(!$("#sheetBg").hidden && $("#cupIn")) openCart();
+  }, ()=>{});
   onSnapshot(doc(db,"config","menu"), snap=>{ agotados = (snap.exists() && snap.data().agotados) || {}; renderMenu(); }, ()=>{});
   if(!E) onSnapshot(doc(db,"config","tienda"), snap=>{ tienda = snap.exists() ? snap.data() : null; setModeUI(); }, ()=>{});
 }
@@ -249,6 +274,7 @@ function setModeUI(){
     const t = tiendaAbierta();
     $("#modeNote").innerHTML = t.abierta
       ? "🛵 Envío $20 con 1 bebida · <b>¡GRATIS pidiendo 2 bebidas o más!</b> Bebidas de medio litro; agranda a 1 litro por +$30."
+        + (cuponDe(cuponAplicado) ? `<span class="cupban">🏷️ Cupón <b>${esc(cuponAplicado)}</b> activado: ${esc(cuponDe(cuponAplicado).desc||"")}. Se aplica al pagar.</span>` : "")
       : `<span class="closed">🔒 Estamos cerrados. ${esc(t.msg)}</span>`;
   }
 }
@@ -296,7 +322,7 @@ function renderCart(){
   const n = cart.reduce((a,l)=>a+l.qty,0);
   $("#cartBar").hidden = n===0 || !$("#status").hidden;
   $("#cartCount").textContent = n + (n===1?" bebida":" bebidas");
-  $("#cartTotal").textContent = mode==="evento" ? "Listo" : money(cartTotal()+envio());
+  $("#cartTotal").textContent = mode==="evento" ? "Listo" : money(totalFinal());
 }
 function openSheet(html){ $("#sheet").innerHTML = html; $("#sheetBg").hidden = false; }
 function closeSheet(){ $("#sheetBg").hidden = true; }
@@ -355,7 +381,7 @@ function openCart(){
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Tu pedido <span class="badge">${mode==="evento"?"En el evento":"A domicilio"}</span></h3>
     ${rows}
     ${mode==="domicilio"?`<button class="ghost" data-close style="margin-top:10px">+ Agregar otra bebida</button>`:""}
-    ${mode==="domicilio"?`<div class="row"><div>Envío${envio()?`<small>¡Gratis pidiendo 2 bebidas o más!</small>`:""}</div><div>${envio()?money(envio()):"<b style='color:var(--neon)'>Gratis</b>"}</div></div><div class="total"><span>Total a pagar</span><span>${money(cartTotal()+envio())}</span></div>`:`<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`}
+    ${mode==="domicilio"?`<div class="row"><div>Envío${envio()?`<small>¡Gratis pidiendo 2 bebidas o más!</small>`:""}</div><div>${envio()?money(envio()):"<b style='color:var(--neon)'>Gratis</b>"}</div></div>${cuponHTML()}<div class="total"><span>Total a pagar</span><span>${money(totalFinal())}</span></div>`:`<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`}
     <div class="grp"><b>Tus datos</b>${datos}</div>
     ${mode==="domicilio"?`<div class="grp"><b>Pago</b><div class="opts">
       <label class="opt"><input type="radio" name="pago" id="p1" value="Efectivo" checked><span>Efectivo</span></label>
@@ -424,6 +450,13 @@ function flash(txt){
   }, 500);
 }
 
+function cuponHTML(){
+  const c = cuponDe(cuponAplicado), d = descuento();
+  return `${c && c.tipo!=="envio" ? `<div class="row cupok"><div>🏷️ Cupón ${esc(cuponAplicado)}<small>${esc(c.desc||"")}</small></div><div>−${money(d)}</div></div>` : ""}
+    ${c && c.tipo==="envio" ? `<div class="row cupok"><div>🏷️ Cupón ${esc(cuponAplicado)}<small>Envío gratis</small></div><div>✓</div></div>` : ""}
+    <div class="cupbox">${c ? `<button class="rm" data-cupoff>Quitar cupón</button>` : `<input id="cupIn" class="t" maxlength="20" placeholder="¿Tienes código de descuento?" autocapitalize="characters" value="${esc(store.get("nf_cupon")||"")}"><button class="ghost" data-cupok style="margin-top:0;width:auto;padding:11px 16px">Aplicar</button>`}</div>
+    ${cuponMsg ? `<p class="err" style="margin-top:6px">${esc(cuponMsg)}</p>` : ""}`;
+}
 function transferInfo(){
   const t = TRANSFER;
   return t.clabe ? `<div class="aviso" style="margin-top:12px"><b>Datos para transferir</b>${esc(t.banco)} · ${esc(t.titular)}<br>CLABE: <span style="user-select:all;font-weight:800">${esc(t.clabe)}</span> <button class="rm" data-copy="${esc(t.clabe)}" style="margin-left:6px">Copiar</button><small>Transfiere el total exacto y sube la foto del comprobante.</small></div>`
@@ -478,7 +511,9 @@ async function send(){
     tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
     items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note})),
-    total: mode==="domicilio"?cartTotal()+envio():0,
+    total: mode==="domicilio"?totalFinal():0,
+    cupon: mode==="domicilio" && cuponDe(cuponAplicado) ? cuponAplicado : "",
+    descuento: mode==="domicilio" ? descuento() + (cuponDe(cuponAplicado)?.tipo==="envio" ? envioBase() : 0) : 0,
     evento: E || "domicilio", barra: E ? BARRA : 0,
     ubicacion: mode==="domicilio" && ubic ? ubic : null,
     comprobante: mode==="domicilio" && document.querySelector('input[name="pago"]:checked')?.value==="Transferencia" ? compData : "",
@@ -490,6 +525,7 @@ async function send(){
     if(mode==="domicilio"){ store.set("nf_tel", orden.tel); store.set("nf_dir", orden.direccion); store.set("nf_ref", orden.ref); }
     mine.unshift({id:ref.id, t:Date.now()}); mine = mine.slice(0,10); saveMine();
     data[ref.id] = {id:ref.id, ...orden, creado:null};
+    if(orden.cupon){ store.del("nf_cupon"); cuponAplicado = ""; }
     cart = []; ubic = null; compData = ""; showStatus(ref.id);
   }catch(e){
     btn.disabled = false; btn.textContent = "Enviar pedido";
@@ -603,6 +639,13 @@ document.addEventListener("click", e=>{
   else if(t.dataset.rm){ cart.splice(+t.dataset.rm,1); cart.length?openCart():(closeSheet(),renderCart()); }
   else if(t.id==="openCart" || t.id==="openCart2") openCart();
   else if(t.id==="geoBtn") askLocation(t);
+  else if(t.dataset.cupok!==undefined){
+    const code = ($("#cupIn")?.value||"").trim().toUpperCase();
+    if(cuponDe(code)){ cuponAplicado = code; store.set("nf_cupon", code); cuponMsg = ""; }
+    else cuponMsg = code ? "Ese código no es válido o ya no está activo." : "Escribe tu código.";
+    renderCart(); openCart();
+  }
+  else if(t.dataset.cupoff!==undefined){ cuponAplicado = ""; store.del("nf_cupon"); cuponMsg = ""; renderCart(); openCart(); }
   else if(t.dataset.copy){ const v = t.dataset.copy; (navigator.clipboard?.writeText(v) || Promise.reject()).then(()=>{ t.textContent = "Copiada ✓"; }).catch(()=>{ t.textContent = "Mantén presionado el número para copiar"; }); }
   else if(t.id==="sendBtn") send();
 });

@@ -186,6 +186,8 @@ body.tv .top{display:none}
 .fx.oc{opacity:.5;cursor:not-allowed}.fx span small{display:block;font-size:11px;color:var(--pink)}
 .fisest{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:6px}
 .fisest div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}.fisest span{display:block;color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.cuptag{background:#7dff3a1a;border-radius:8px;padding:4px 8px;margin:4px 0}
+.cuprep{display:block;color:var(--gold);font-weight:800}
 </style>
 </head>
 <body>
@@ -298,6 +300,51 @@ const NEXT = {
 };
 const TABS = [["nuevo","Nuevos"],["preparando","Prep."],["lista","Listos"],["entregado","Entreg."],["cancelado","Cancel."]];
 const MOT_CANCEL = {domicilio:["Cliente no pagó","No se encontró el domicilio","Cliente no contestó","Cliente canceló","Se terminó el insumo","Pedido duplicado"], evento:["Invitado no llegó por ella","Pedido duplicado","Se terminó el insumo","Invitado canceló"]};
+// ===== Cupones =====
+let cupones = {}, cupUsos = {}, cupCheck = {};
+function cupRepetido(p){
+  const k = p.tel+"|"+p.cupon;
+  if(!(k in cupCheck)){
+    cupCheck[k] = null;
+    getDocs(query(collection(db,"pedidos"), where("tel","==",p.tel)))
+      .then(sn=>{ cupCheck[k] = sn.docs.filter(d=>d.id!==p.id && d.data().cupon===p.cupon && d.data().estado!=="cancelado").length; render(); })
+      .catch(()=>{ cupCheck[k] = 0; });
+  }
+  const n = cupCheck[k];
+  return n ? `<span class="cuprep">⚠️ Este teléfono ya usó este cupón ${n} ${n===1?"vez":"veces"}</span>` : "";
+}
+function cuponesView(){
+  const lista = Object.entries(cupones).sort((a,b)=>a[0].localeCompare(b[0]));
+  const tipoTxt = c => c.tipo==="pct" ? c.valor+"% de descuento" : c.tipo==="monto" ? "$"+c.valor+" de descuento" : "Envío gratis";
+  return `<div class="crumb"><button class="sec" data-home>← Inicio</button><div><b>Cupones de descuento</b></div></div>
+    <p class="hint">Los cupones solo aplican a domicilio. El cliente lo escribe al pagar, o se aplica solo si escanea un QR con el código. En cada pedido verás qué cupón usó y si ese teléfono ya lo había usado.</p>
+    ${lista.length ? `<div class="mlist">${lista.map(([k,c])=>`<div class="mi${c.activo?"":" off"}">
+      <div class="mtog" style="cursor:default"><span><b style="font-size:17px">${esc(k)}</b><small style="display:block;color:var(--muted);font-weight:700">${esc(tipoTxt(c))}${c.desc?" · "+esc(c.desc):""}</small></span><b>${c.activo?"Activo":"Pausado"}</b></div>
+      <div class="evb" style="margin-top:8px"><button class="sec" data-cuptog="${esc(k)}">${c.activo?"Pausar":"Activar"}</button><button class="sec" data-cupusos="${esc(k)}">${k in cupUsos?`Usado ${cupUsos[k]} ${cupUsos[k]===1?"vez":"veces"}`:"Ver cuántos lo usaron"}</button><button class="sec" data-cupqr="${esc(k)}">QR del cupón</button><button class="sec danger" data-cupdel="${esc(k)}">Borrar</button></div>
+      ${cupQR===k?`<figure style="margin:10px 0 0;text-align:center"><canvas id="cupCanvas" width="900" height="900" hidden></canvas><img id="cupImg" alt="QR del cupón" style="width:100%;max-width:320px;border-radius:12px;background:#fff"><figcaption class="hint">Al escanearlo, el cupón se aplica solo. Mantén presionada la imagen para guardarla.</figcaption></figure>`:""}
+    </div>`).join("")}</div>` : `<p class="empty">Aún no tienes cupones. Crea el primero abajo.</p>`}
+    <h2>Crear cupón</h2>
+    <form id="cupForm" class="evf">
+      <label for="cupCod">Código (sin espacios)<input id="cupCod" maxlength="20" placeholder="Ej. NANOS10" autocapitalize="characters"></label>
+      <div class="row2">
+        <label for="cupTipo">Tipo<select id="cupTipo"><option value="pct">% de descuento</option><option value="monto">$ de descuento</option><option value="envio">Envío gratis</option></select></label>
+        <label for="cupVal">Valor<input id="cupVal" type="number" min="0" max="1000" inputmode="numeric" placeholder="10"></label>
+      </div>
+      <label for="cupDesc">Texto para el cliente<input id="cupDesc" maxlength="50" placeholder="Ej. 10% de descuento en tu pedido"></label>
+      <button class="go" type="submit" id="cupBtn">Crear cupón</button>
+      <p class="err" id="cupErr"></p>
+    </form>`;
+}
+let cupQR = null;
+function drawCupQR(){
+  const cv = $("#cupCanvas"); if(!cv || !window.qrcode) return;
+  const c = cv.getContext("2d"), url = `${BASE}?c=${encodeURIComponent(cupQR)}`, q = qrcode(0,"M"); q.addData(url); q.make();
+  const n = q.getModuleCount(), m = 60, cell = (900-2*m)/n;
+  c.fillStyle = "#fff"; c.fillRect(0,0,900,900); c.fillStyle = "#140a2e";
+  for(let r=0;r<n;r++) for(let k=0;k<n;k++) if(q.isDark(r,k)) c.fillRect(Math.floor(m+k*cell), Math.floor(m+r*cell), Math.ceil(cell), Math.ceil(cell));
+  $("#cupImg").src = cv.toDataURL("image/png");
+}
+async function guardarCupones(n){ cupones = n; render(); await setDoc(doc(db,"config","cupones"), {codigos: n}); }
 const MOT_REEMB = ["No le gustó la bebida","Llegó maltratada / derramada","Bebida equivocada","Faltó una bebida","Llegó muy tarde"];
 let accion = null; // {id, tipo:"cancel"|"reemb"}
 
@@ -370,11 +417,12 @@ function render(){
   if(["cola","qr","resumen","pantalla"].includes(v) && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
   const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id] = i.type==="checkbox" ? {c:i.checked} : i.value; });
   const focused = document.activeElement?.id;
-  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : v==="fijos" ? fijosView() : "";
+  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : v==="fijos" ? fijosView() : v==="cupones" ? cuponesView() : "";
   if(freshForm){ freshForm = false; for(const k in keep) if(/^h/.test(k)) delete keep[k]; }
   Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(!i) return; if(val && typeof val==="object") i.checked = val.c; else i.value = val; });
   if(focused){ const f=document.getElementById(focused); if(f && f.matches("input,select")) f.focus(); }
   if(v==="qr" || v==="fijos"){ drawQRs(); drawTents(); }
+  if(v==="cupones" && cupQR) drawCupQR();
 }
 
 function homeView(){
@@ -429,7 +477,7 @@ function homeView(){
       <p class="hint" style="margin:0 0 8px">Imprímelos una sola vez. Cada QR abre el evento al que asignes esa barra.</p>
       <div class="evb" style="margin-bottom:18px"><button class="sec" data-view="fijos">🔳 Ver e imprimir QR fijos</button></div>
       <h2>Menú y horario</h2>
-      <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button><button class="sec" data-view="historial">📥 Descargar y vaciar pedidos</button></div>
+      <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button><button class="sec" data-view="historial">📥 Descargar y vaciar pedidos</button><button class="sec" data-view="cupones">🏷️ Cupones de descuento</button></div>
     </section>`;
 }
 // ===== Historial: descargar en Excel y vaciar =====
@@ -483,7 +531,7 @@ async function buscarHist(desde, hasta){
 }
 function descargarHist(){
   const q = v => `"${String(v ?? "").replace(/"/g,'""')}"`;
-  const rows = [["Fecha","Hora","Tipo","Evento","Barra","Número","Nombre","Bebidas","Detalle","Pago","Total","Teléfono","Dirección","Referencias","Ubicación","Comprobante","Estado","Motivo cancelación","Reembolso","Motivo reembolso"]];
+  const rows = [["Fecha","Hora","Tipo","Evento","Barra","Número","Nombre","Bebidas","Detalle","Pago","Total","Teléfono","Dirección","Referencias","Ubicación","Comprobante","Estado","Motivo cancelación","Reembolso","Motivo reembolso","Cupón","Descuento"]];
   hist.docs.forEach(({data:p})=>{
     const f = p.creado.toDate();
     rows.push([ymd(f), f.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"}), p.modo==="domicilio"?"Domicilio":"Evento",
@@ -491,7 +539,7 @@ function descargarHist(){
       (p.items||[]).map(it=>`${it.cant}x ${it.nombre}${it.tam?" ("+it.tam+")":""}`).join(" + "),
       (p.items||[]).map(it=>[...(it.opciones||[]), it.nota?"Nota: "+it.nota:""].filter(Boolean).join(", ")).filter(Boolean).join(" | "),
       p.pago||"", p.modo==="domicilio"?(p.total||0):"", p.tel||"", p.direccion||"", p.ref||"",
-      p.ubicacion?`https://maps.google.com/?q=${p.ubicacion.lat},${p.ubicacion.lng}`:"", p.comprobante?"Sí":"", p.estado, p.cancelMotivo||"", p.reembolso?p.reembolso.monto:"", p.reembolso?p.reembolso.motivo:""]);
+      p.ubicacion?`https://maps.google.com/?q=${p.ubicacion.lat},${p.ubicacion.lng}`:"", p.comprobante?"Sí":"", p.estado, p.cancelMotivo||"", p.reembolso?p.reembolso.monto:"", p.reembolso?p.reembolso.motivo:"", p.cupon||"", p.descuento||""]);
   });
   const csv = "\ufeff" + rows.map(r=>r.map(q).join(",")).join("\r\n");
   const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
@@ -519,6 +567,7 @@ const NFM = window.NF_MENU;
 let agotados = {}, tienda = null, menuMarca = "fizz", freshForm = false;
 function listenConfig(){
   onSnapshot(doc(db,"config","menu"), s=>{ agotados = (s.exists() && s.data().agotados) || {}; if(["menu","home"].includes(sel.view)) render(); }, ()=>{});
+  onSnapshot(doc(db,"config","cupones"), s=>{ cupones = (s.exists() && s.data().codigos) || {}; if(sel.view==="cupones") render(); }, ()=>{});
   onSnapshot(doc(db,"config","barras"), s=>{ asign = (s.exists() && s.data().asign) || {}; if(["home","fijos"].includes(sel.view)) render(); }, ()=>{});
   onSnapshot(doc(db,"config","tienda"), s=>{ tienda = s.exists() ? s.data() : null; if(["horario","home"].includes(sel.view)){ freshForm = true; render(); } }, ()=>{});
 }
@@ -600,6 +649,7 @@ function card(p){
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
       ${p.ubicacion&&p.ubicacion.lat?`<div><a class="maplnk" href="https://www.google.com/maps/search/?api=1&query=${p.ubicacion.lat},${p.ubicacion.lng}" target="_blank" rel="noopener">🗺️ Abrir ubicación en Maps</a> <small>(±${p.ubicacion.prec||"?"} m)</small></div>`:`<div><small>Sin ubicación GPS, usar dirección escrita</small></div>`}
       <div>🛵 ${(p.items||[]).reduce((a,it)=>a+(it.cant||1),0)>=2?"Envío <b>gratis</b>":"Envío <b>$20</b> (ya incluido)"}</div>
+      ${p.cupon?`<div class="cuptag">🏷️ Cupón <b>${esc(p.cupon)}</b> · −${money(p.descuento||0)}${cupRepetido(p)}</div>`:""}
       <div>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":" · ya pagado"}</div>
       ${p.estado==="nuevo"&&p.pago==="Transferencia"?`<div class="nocomp">Revisa en tu banco que llegó el pago antes de preparar</div>`:""}
       ${p.pago==="Transferencia"?(p.comprobante?`<button class="compbtn" data-comp="${p.id}"><img src="${p.comprobante}" alt="Comprobante"><span>Ver comprobante</span></button>`:`<div class="nocomp">⚠️ Sin comprobante todavía</div>`):""}</div>`:""}
@@ -822,6 +872,17 @@ $("#loginForm").addEventListener("submit", async e=>{
   btn.disabled = false;
 });
 document.addEventListener("submit", async e=>{
+  if(e.target.id==="cupForm"){
+    e.preventDefault();
+    const cod = $("#cupCod").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,""), tipo = $("#cupTipo").value, valor = parseInt($("#cupVal").value||"0",10)||0;
+    let desc = $("#cupDesc").value.trim();
+    if(!cod){ $("#cupErr").textContent = "Escribe el código."; return; }
+    if(tipo!=="envio" && valor<=0){ $("#cupErr").textContent = "Pon el valor del descuento."; return; }
+    if(tipo==="pct" && valor>100){ $("#cupErr").textContent = "El porcentaje no puede ser mayor a 100."; return; }
+    if(!desc) desc = tipo==="pct" ? valor+"% de descuento en tu pedido" : tipo==="monto" ? "$"+valor+" de descuento en tu pedido" : "Envío gratis en tu pedido";
+    try{ await guardarCupones({...cupones, [cod]: {tipo, valor, desc, activo:true}}); }catch{ $("#cupErr").textContent = "No se pudo guardar. Revisa el internet."; }
+    return;
+  }
   if(e.target.id==="hsForm"){ e.preventDefault(); const a = $("#hsDe").value, b = $("#hsA").value; if(a && b && a<=b) buscarHist(a,b); return; }
   if(e.target.id==="hrForm"){
     e.preventDefault();
@@ -877,6 +938,11 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.qr){ go({view:"qr", evento:t.dataset.qr}); }
   else if(t.dataset.res){ cerrando = null; go({view:"resumen", evento:t.dataset.res}); }
   else if(t.dataset.home!==undefined){ go({view:"home"}); }
+  else if(t.dataset.cuptog){ const k = t.dataset.cuptog; try{ await guardarCupones({...cupones, [k]: {...cupones[k], activo: !cupones[k].activo}}); }catch{} }
+  else if(t.dataset.cupdel){ const k = t.dataset.cupdel, n = {...cupones}; delete n[k]; if(cupQR===k) cupQR = null; try{ await guardarCupones(n); }catch{} }
+  else if(t.dataset.cupqr){ cupQR = cupQR===t.dataset.cupqr ? null : t.dataset.cupqr; render(); }
+  else if(t.dataset.cupusos){ const k = t.dataset.cupusos; t.textContent = "Contando…";
+    try{ const sn = await getDocs(query(collection(db,"pedidos"), where("cupon","==",k))); cupUsos[k] = sn.docs.filter(d=>d.data().estado!=="cancelado").length; }catch{ cupUsos[k] = 0; } render(); }
   else if(t.dataset.view){ if(t.dataset.view==="historial") hist = null; go({view:t.dataset.view}); }
   else if(t.dataset.rango){ domRango = t.dataset.rango; known = null; listenPedidos(); render(); }
   else if(t.dataset.hq){
