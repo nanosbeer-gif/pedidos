@@ -173,6 +173,7 @@ body.tv .top{display:none}
 .tagref{margin-top:10px;background:#ffc53d26;color:var(--gold);border-radius:10px;padding:8px 10px;font-weight:800;font-size:13.5px}
 .ord:has(.tagbad){opacity:.75}
 .go[disabled]{opacity:.45;cursor:not-allowed}
+.evc.cerr{opacity:.85;border-style:dashed}
 </style>
 </head>
 <body>
@@ -289,7 +290,15 @@ const MOT_REEMB = ["No le gustó la bebida","Llegó maltratada / derramada","Beb
 let accion = null; // {id, tipo:"cancel"|"reemb"}
 
 function go(s){ knownListos = null; sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
-function ev(id){ return eventos.find(e=>e.id===id); }
+let cerrados = null;
+function ev(id){ return eventos.find(e=>e.id===id) || (cerrados||[]).find(e=>e.id===id); }
+async function cargarCerrados(){
+  try{
+    const snap = await getDocs(query(collection(db,"eventos"), where("estado","==","cerrado")));
+    cerrados = snap.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>(b.creado?.toMillis?.()||0)-(a.creado?.toMillis?.()||0));
+  }catch{ cerrados = []; }
+  render();
+}
 function fecha(ts){ try{ return ts.toDate().toLocaleDateString("es-MX",{day:"numeric",month:"short"}); }catch{ return "hoy"; } }
 function ago(ts){
   if(!ts) return "ahora";
@@ -369,6 +378,14 @@ function homeView(){
     <section class="blk">
       <h2>Eventos activos</h2>
       ${cards || `<p class="empty">No hay eventos activos. Crea uno abajo.</p>`}
+    </section>
+    <section class="blk">
+      <h2>Eventos cerrados</h2>
+      ${cerrados===null ? `<button class="sec" data-vercerr>📁 Ver eventos cerrados</button>`
+        : cerrados.length ? cerrados.map(e=>`<article class="evc cerr">
+            <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.barras} ${e.barras>1?"barras":"barra"} · Cerrado</small></div>
+            <div class="evb"><button class="sec" data-res="${e.id}">Resumen</button><button class="sec" data-reabrir="${e.id}">Reabrir evento</button></div>
+          </article>`).join("") : `<p class="empty">No hay eventos cerrados.</p>`}
     </section>
     <section class="blk">
       <h2>Crear evento</h2>
@@ -629,8 +646,9 @@ function resumenView(){
     <div class="top">${topList.length?topList.map(([n,c])=>`<div><span>${esc(n)}</span><b>${c}</b></div>`).join(""):`<p class="empty">Aún no hay pedidos_.</p>`}</div>
     <div class="blk">
       ${cerrando===e.id
-        ? `<p class="hint">Al cerrar el evento su QR deja de aceptar pedidos_. ${pend?`<b>Quedan ${pend} pedidos sin entregar.</b>`:""}</p>
+        ? `<p class="hint">Al cerrar el evento su QR deja de aceptar pedidos. ${pend?`<b>Quedan ${pend} pedidos sin entregar.</b>`:""}</p>
            <div class="evb"><button class="go lista" data-cerrar="${e.id}">Sí, cerrar evento</button><button class="sec" data-nocerrar>Cancelar</button></div>`
+        : e.estado==="cerrado" ? `<p class="hint">Este evento está cerrado: su QR ya no acepta pedidos.</p><button class="sec" data-reabrir="${e.id}">Reabrir evento</button>`
         : `<button class="sec danger" data-precerrar="${e.id}">Cerrar evento</button>`}
     </div>`;
 }
@@ -757,11 +775,17 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.hdel!==undefined){ borrarHist(); }
   else if(t.dataset.mmarca){ menuMarca = t.dataset.mmarca; render(); }
   else if(t.dataset.ag){ setAgotado(t.dataset.ag, !agotados[t.dataset.ag]); }
+  else if(t.dataset.vercerr!==undefined){ t.disabled = true; t.textContent = "Cargando…"; cargarCerrados(); }
+  else if(t.dataset.reabrir){
+    t.disabled = true;
+    try{ await updateDoc(doc(db,"eventos",t.dataset.reabrir), {estado:"activo"}); if(cerrados) cerrados = cerrados.filter(e=>e.id!==t.dataset.reabrir); go({view:"home"}); }
+    catch{ t.disabled = false; }
+  }
   else if(t.dataset.precerrar){ cerrando = t.dataset.precerrar; render(); }
   else if(t.dataset.nocerrar!==undefined){ cerrando = null; render(); }
   else if(t.dataset.cerrar){
     t.disabled = true;
-    try{ await updateDoc(doc(db,"eventos",t.dataset.cerrar), {estado:"cerrado"}); cerrando = null; go({view:"home"}); }
+    try{ await updateDoc(doc(db,"eventos",t.dataset.cerrar), {estado:"cerrado"}); cerrando = null; if(cerrados){ const e = eventos.find(x=>x.id===t.dataset.cerrar); if(e) cerrados.unshift({...e, estado:"cerrado"}); } go({view:"home"}); }
     catch{ t.disabled = false; }
   }
   else if(t.dataset.to){
