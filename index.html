@@ -142,6 +142,16 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 .row.cupok small{color:var(--muted)}
 .cupban{display:block;margin-top:8px;background:#7dff3a1a;border:1.5px solid var(--neon);color:var(--fg);border-radius:12px;padding:8px 10px}
 .old{opacity:.55;font-size:.8em;font-weight:600}
+.wafab{border:0;cursor:pointer;font-family:inherit;position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:6;display:flex;align-items:center;gap:8px;background:#25d366;color:#0b3d1e;font-weight:800;font-size:14px;text-decoration:none;padding:11px 15px;border-radius:999px;box-shadow:0 6px 20px #0008}
+.wafab:focus-visible,.wabtn:focus-visible{outline:2px solid var(--neon);outline-offset:3px}
+.wabtn{border:0;cursor:pointer;font-family:inherit;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:10px;background:#25d366;color:#0b3d1e;font-weight:800;font-size:15px;text-decoration:none;padding:13px 16px;border-radius:14px}
+.contra{margin-top:24px;background:var(--panel);border:1.5px solid var(--line);border-radius:18px;padding:16px;text-align:center}
+.contra b{display:block;font-family:var(--display);font-weight:400;font-size:22px;color:var(--neon)}
+.contra p{color:var(--muted);margin:6px 0 12px}
+.waopts{display:grid;gap:8px;margin-top:14px}
+.waopt{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:var(--panel2);border:1.5px solid var(--line);color:var(--fg);text-decoration:none;font-weight:800;font-size:15px}
+.waopt:active,.waopt:hover{border-color:#25d366}
+.waopt .ic{font-size:20px}.waopt span:nth-child(2){flex:1}.waopt .go2{color:#25d366;font-size:24px}
 </style>
 </head>
 <body>
@@ -157,11 +167,13 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
     <section id="mine" hidden></section>
     <nav class="chips" id="chips" aria-label="Categorías"></nav>
     <main id="menu"></main>
+    <div id="contrata" hidden></div>
   </div>
   <section id="status" hidden aria-live="polite"></section>
 </div>
 
 <div class="cart" id="cartBar" hidden><button id="openCart"><span id="cartCount">0 bebidas</span><span>Ver pedido · <span id="cartTotal">$0</span></span></button></div>
+<button class="wafab" id="waFab" data-wa hidden><svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path fill="currentColor" d="M12 3C6.9 3 3 6.6 3 11c0 2.3 1.1 4.4 2.9 5.9L5 21l4.3-2.1c.9.2 1.8.3 2.7.3 5.1 0 9-3.6 9-8.1S17.1 3 12 3zm-4 9.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg><span id="waTxt">WhatsApp</span></button>
 <div class="sheetbg" id="sheetBg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 
 <script src="menu.js?v=26"></script>
@@ -202,6 +214,56 @@ function pctCupon(){ const c = cuponDe(cuponAplicado); return c && c.tipo==="pct
 function precioHTML(v){ const pc = pctCupon(); return pc ? `<s class="old">${money(v)}</s> ${money(Math.round(v*(100-pc)/100))}` : money(v); }
 function totalFinal(){ return Math.max(0, cartTotal() + envio() - descuento()); }
 // Datos para transferencia (se muestran al cliente si están llenos)
+// WhatsApp: número de pedidos a domicilio y número para contrataciones de eventos (con 52 al inicio)
+const WA_PEDIDOS = "525629842239";
+const WA_EVENTOS = "525629842239";
+const WA_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path fill="currentColor" d="M12 3C6.9 3 3 6.6 3 11c0 2.3 1.1 4.4 2.9 5.9L5 21l4.3-2.1c.9.2 1.8.3 2.7.3 5.1 0 9-3.6 9-8.1S17.1 3 12 3zm-4 9.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg>`;
+const waLink = (num, txt) => `https://wa.me/${num}?text=${encodeURIComponent(txt)}`;
+function opcionesWA(){
+  const p = pedidoActivo(), ev = (evento && evento.nombre) || "donde estuvieron";
+  const ref = p ? ` Pedido ${p.numero} a nombre de ${p.nombre}.` : "";
+  if(mode==="domicilio"){
+    return [
+      ...(p ? [
+        ["🛵","¿Cuánto falta para mi pedido?", `🛵 [ESTATUS]${ref} ¿Cuánto falta para que llegue?`],
+        ["✏️","Cambiar o cancelar mi pedido", `✏️ [CAMBIO]${ref} Quiero hacer un cambio: `],
+        ["💸","Ya hice mi transferencia", `💸 [PAGO]${ref} Ya hice la transferencia, te envío el comprobante.`],
+      ] : []),
+      ["⚠️","Tuve un problema con mi pedido", `⚠️ [PROBLEMA]${ref} Tuve un problema con mi pedido: `],
+      ["🥤","Pregunta sobre el menú o precios", "🥤 [MENÚ] Hola, tengo una pregunta sobre el menú: "],
+      ["📦","Pedido grande o para fiesta", "📦 [PEDIDO GRANDE] Hola, quiero hacer un pedido grande. Para el día: ___  Cantidad de bebidas: ___"],
+      ["🎉","Contratar la barra para mi evento", "🎉 [CONTRATACIÓN] Hola, quiero cotizar la barra para mi evento. Fecha: ___  Personas: ___"],
+    ];
+  }
+  return [
+    ["🎉","Contratar la barra para mi evento", `🎉 [CONTRATACIÓN] ¡Hola! Los vi en el evento ${ev} y quiero cotizar la barra para mi evento. Fecha: ___  Personas: ___  Lugar: ___`],
+    ["🎶","Otros servicios (DJ, cabina 360, robot LED…)", `🎶 [SERVICIOS] ¡Hola! Los vi en el evento ${ev} y me interesa: ___`],
+    ["🛵","Pedir bebidas a domicilio", `🛵 [DOMICILIO] ¡Hola! Los conocí en el evento ${ev}, ¿hasta dónde entregan a domicilio?`],
+    ...(p ? [["⚠️","Problema con mi bebida aquí", `⚠️ [EVENTO ${ev}] Tengo un problema con mi bebida.${ref}`]] : []),
+  ];
+}
+function openWA(){
+  const num = mode==="domicilio" ? WA_PEDIDOS : WA_EVENTOS;
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>¿En qué te ayudamos?</h3>
+    <p class="desc" style="margin-top:6px">Elige una opción y se abre WhatsApp con tu mensaje listo.</p>
+    <div class="waopts">${opcionesWA().map(([ic,t,msg])=>`<a class="waopt" href="${waLink(num,msg)}" target="_blank" rel="noopener"><span class="ic">${ic}</span><span>${esc(t)}</span><span class="go2">›</span></a>`).join("")}</div>`);
+}
+function pedidoActivo(){ return mine.map(m=>data[m.id]).find(p=>p && p.estado!=="entregado" && p.estado!=="cancelado" && (E ? p.evento===E : p.modo==="domicilio")); }
+function renderWA(){
+  const fab = $("#waFab"), box = $("#contrata"); if(!fab) return;
+  const nombreEv = evento && evento.nombre ? evento.nombre : "";
+  if(mode==="domicilio"){
+    const p = pedidoActivo();
+    const txt = p ? `Hola Nano's Fizz 👋 Tengo una duda sobre mi pedido número ${p.numero} a nombre de ${p.nombre}.` : "Hola Nano's Fizz 👋 Tengo una pregunta.";
+    $("#waTxt").textContent = p ? "Ayuda con mi pedido" : "Escríbenos"; fab.hidden = false;
+    box.hidden = true;
+  } else {
+    const txt = `¡Hola! Los vi en el evento ${nombreEv || "donde estuvieron"} y me gustaría información para contratarlos en mi evento. 🎉`;
+    $("#waTxt").textContent = "Contrátanos"; fab.hidden = false;
+    box.hidden = false;
+    box.innerHTML = `<div class="contra"><b>¿Te gustó la barra? 🎉</b><p>Llévanos a tu fiesta: XV años, bodas, cumpleaños y más.</p><button class="wabtn" data-wa>${WA_ICON}<span>Pedir información por WhatsApp</span></button></div>`;
+  }
+}
 const TRANSFER = { banco:"Plata", titular:"Adrián Sánchez González", clabe:"646198405606567407" };
 
 let cat = "todas", cart = [], pendingBeep = false;
@@ -265,7 +327,7 @@ function listenConfig(){
   if(!E) onSnapshot(doc(db,"config","tienda"), snap=>{ tienda = snap.exists() ? snap.data() : null; setModeUI(); }, ()=>{});
 }
 setInterval(()=>{ if(!E) setModeUI(); }, 60000);
-function setModeUI(){
+function setModeUI(){ setTimeout(renderWA, 0);
   if(mode==="evento"){
     $("#evName").textContent = sinEvento ? "Sin evento activo" : evento ? evento.nombre : evento===false ? "Evento terminado" : "Cargando evento…";
     $("#modeNote").textContent = sinEvento ? "Esta barra todavía no tiene un evento activo. Pregunta en la barra o intenta en unos minutos."
@@ -576,7 +638,7 @@ function track(id){
   }, ()=>{ delete watchers[id]; if(viewing===id) $("#status").innerHTML = `<div class="st"><p class="err">Se perdió la conexión. Revisa tu señal y vuelve a abrir la página.</p><button class="ghost" id="backBtn">Volver al menú</button></div>`; });
 }
 
-function renderMine(){
+function renderMine(){ setTimeout(renderWA, 0);
   const list = mine.map(m=>data[m.id]).filter(p=>p && (E ? p.evento===E : p.modo==="domicilio"));
   const box = $("#mine");
   if(!list.length){ box.hidden = true; return; }
@@ -595,7 +657,7 @@ function showStatus(id){
   if(data[id]) renderStatus(data[id]); else $("#status").innerHTML = `<div class="st"><p class="note">Cargando tu pedido…</p></div>`;
   track(id);
 }
-function renderStatus(p){
+function renderStatus(p){ setTimeout(renderWA, 0);
   const pasos = PASOS[p.modo]||PASOS.evento, idx = Math.max(0, pasos.findIndex(x=>x[0]===p.estado));
   const big = p.estado==="lista"
     ? (p.modo==="evento" ? `<div class="ready">¡Tu bebida está lista! 🥤<span>Pasa a la barra y di tu número</span></div>` : `<div class="ready">¡Tu pedido va en camino! 🛵<span>Ten listo tu pago</span></div>`)
@@ -610,6 +672,8 @@ function renderStatus(p){
     <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)}${it.tam?` (${esc(it.tam)})`:""}</div>`).join("")}${p.modo==="domicilio"?`<div style="margin-top:6px"><b>Total: ${money(p.total||0)}</b> · ${esc(p.pago)}</div>`:""}</div>
     ${p.modo==="domicilio" && p.pago==="Transferencia" && p.estado!=="entregado" ? (p.comprobante ? `<p class="note" style="margin-top:12px">🧾 Comprobante recibido ✓</p>` : `<div style="margin-top:14px">${transferInfo()}<label class="primary" for="compLater" style="margin-top:10px">🧾 Subir comprobante</label><input type="file" id="compLater" data-order="${p.id}" accept="image/*" hidden><p class="note" id="compMsg"></p></div>`) : ""}
     ${(p.estado==="entregado"||p.estado==="cancelado")&&p.modo==="evento"?`<button class="primary" id="backBtn">Pedir otra bebida</button>`:`<button class="ghost" id="backBtn">Ver el menú</button>`}
+    ${p.modo==="evento" && (p.estado==="lista"||p.estado==="entregado") ? `<button class="wabtn" style="margin-top:14px;width:100%" data-wa>${WA_ICON}<span>¿Te gustó? Contrátanos para tu evento</span></button>` : ""}
+    ${p.modo==="domicilio" && p.estado!=="entregado" ? `<button class="wabtn" style="margin-top:14px;width:100%" data-wa>${WA_ICON}<span>Escríbenos sobre tu pedido</span></button>` : ""}
     ${p.modo==="evento"&&p.estado!=="entregado"?`<p class="note" style="margin-top:12px">Si cierras la página, tu pedido sigue guardado en "Mis pedidos".</p>`:""}
   </div>`;
 }
@@ -630,6 +694,7 @@ function lockSheet(p){
 document.addEventListener("click", e=>{
   if(e.target.id==="sheetBg"){ closeSheet(); return; }
   const t = e.target.closest("button"); if(!t) return;
+  if(t.dataset.wa!==undefined){ openWA(); return; }
   if(t.dataset.marca) setMarca(t.dataset.marca);
   else if(t.dataset.mayor){ store.set("nf_18","1"); closeSheet(); setMarca(t.dataset.mayor); }
   else if(t.dataset.mine) showStatus(t.dataset.mine);
