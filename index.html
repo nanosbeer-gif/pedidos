@@ -549,7 +549,14 @@ function askLocation(btn){
   if(!navigator.geolocation){ $("#geoMsg").textContent = "Tu navegador no permite compartir ubicación. Escribe bien la dirección."; return; }
   btn.textContent = "📍 Buscando tu ubicación…";
   navigator.geolocation.getCurrentPosition(pos=>{
-    ubic = {lat:+pos.coords.latitude.toFixed(6), lng:+pos.coords.longitude.toFixed(6), prec:Math.round(pos.coords.accuracy||0)};
+    const prec = Math.round(pos.coords.accuracy||0);
+    if(prec > 300){
+      ubic = null;
+      btn.textContent = "📍 Intentar de nuevo";
+      $("#geoMsg").textContent = `Tu ubicación salió muy imprecisa (±${prec>=1000?Math.round(prec/1000)+" km":prec+" m"}), así que no la mandamos. Activa el GPS / Ubicación de tu celular y vuelve a intentar, o asegúrate de que tu dirección esté bien escrita.`;
+      return;
+    }
+    ubic = {lat:+pos.coords.latitude.toFixed(6), lng:+pos.coords.longitude.toFixed(6), prec};
     btn.textContent = "📍 Ubicación agregada ✓ (toca para actualizar)";
     $("#geoMsg").textContent = `Precisión aprox. ${ubic.prec} m`;
   }, ()=>{

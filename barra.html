@@ -647,7 +647,7 @@ function card(p){
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
-      ${p.ubicacion&&p.ubicacion.lat?`<div><a class="maplnk" href="https://www.google.com/maps/search/?api=1&query=${p.ubicacion.lat},${p.ubicacion.lng}" target="_blank" rel="noopener">🗺️ Abrir ubicación en Maps</a> <small>(±${p.ubicacion.prec||"?"} m)</small></div>`:`<div><small>Sin ubicación GPS, usar dirección escrita</small></div>`}
+      ${p.ubicacion&&p.ubicacion.lat?`<div><a class="maplnk" href="https://www.google.com/maps/search/?api=1&query=${p.ubicacion.lat},${p.ubicacion.lng}" target="_blank" rel="noopener">🗺️ Abrir ubicación en Maps</a> ${(p.ubicacion.prec||0)>300?`<small style="color:#ffb020">⚠️ imprecisa (±${Math.round(p.ubicacion.prec/1000)} km): guíate por la dirección</small>`:`<small>(±${p.ubicacion.prec||"?"} m)</small>`}</div>`:`<div><small>Sin ubicación GPS, usar dirección escrita</small></div>`}
       <div>🛵 ${(p.items||[]).reduce((a,it)=>a+(it.cant||1),0)>=2?"Envío <b>gratis</b>":"Envío <b>$20</b> (ya incluido)"}</div>
       ${p.cupon?`<div class="cuptag">🏷️ Cupón <b>${esc(p.cupon)}</b> · −${money(p.descuento||0)}${cupRepetido(p)}</div>`:""}
       <div>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":" · ya pagado"}</div>
