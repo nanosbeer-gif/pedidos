@@ -188,6 +188,9 @@ body.tv .top{display:none}
 .fisest div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}.fisest span{display:block;color:var(--muted);font-size:13px;overflow-wrap:anywhere}
 .cuptag{background:#7dff3a1a;border-radius:8px;padding:4px 8px;margin:4px 0}
 .cuprep{display:block;color:var(--gold);font-weight:800}
+.fun{margin:8px 0}.funl{display:flex;justify-content:space-between;gap:10px;font-size:15px}.funl small{color:var(--muted);font-weight:700;margin-left:4px}
+.funb{height:12px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:4px}.funb i{display:block;height:100%;background:linear-gradient(90deg,#b6ff3b,#5fd3ff);border-radius:6px}
+.srcc{padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}.srcc b{display:block}.srcc small{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -216,7 +219,7 @@ body.tv .top{display:none}
 </div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, getDocs, getDoc, setDoc, writeBatch, Timestamp, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, getDocs, getDoc, setDoc, writeBatch, Timestamp, serverTimestamp, documentId } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const app = initializeApp({
@@ -417,7 +420,7 @@ function render(){
   if(["cola","qr","resumen","pantalla"].includes(v) && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
   const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id] = i.type==="checkbox" ? {c:i.checked} : i.value; });
   const focused = document.activeElement?.id;
-  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : v==="fijos" ? fijosView() : v==="cupones" ? cuponesView() : "";
+  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : v==="fijos" ? fijosView() : v==="cupones" ? cuponesView() : v==="stats" ? statsView() : "";
   if(freshForm){ freshForm = false; for(const k in keep) if(/^h/.test(k)) delete keep[k]; }
   Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(!i) return; if(val && typeof val==="object") i.checked = val.c; else i.value = val; });
   if(focused){ const f=document.getElementById(focused); if(f && f.matches("input,select")) f.focus(); }
@@ -477,8 +480,46 @@ function homeView(){
       <p class="hint" style="margin:0 0 8px">Imprímelos una sola vez. Cada QR abre el evento al que asignes esa barra.</p>
       <div class="evb" style="margin-bottom:18px"><button class="sec" data-view="fijos">🔳 Ver e imprimir QR fijos</button></div>
       <h2>Menú y horario</h2>
-      <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button><button class="sec" data-view="historial">📥 Descargar y vaciar pedidos</button><button class="sec" data-view="cupones">🏷️ Cupones de descuento</button></div>
+      <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button><button class="sec" data-view="historial">📥 Descargar y vaciar pedidos</button><button class="sec" data-view="cupones">🏷️ Cupones de descuento</button><button class="sec" data-view="stats">📊 Visitas y conversión</button></div>
     </section>`;
+}
+// ===== Visitas y conversión (embudo de la app de domicilio) =====
+let statsR = "hoy", statsData = null, statsErr = "";
+const mxDia = d => new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City"}).format(d);
+const PASOS = [["visita","Entraron a la app"],["producto","Abrieron una bebida"],["carrito","Agregaron al carrito"],["checkout","Abrieron su pedido"],["pedido","Enviaron pedido"]];
+const FUENTES = {PRIMERA:"Anuncio y estados (PRIMERA)", VASO:"Calcomanía del vaso (VASO)", IMAN:"Imán de refri (IMAN)", NANOS20:"Calcomanía 20% (NANOS20)", DIRECTO:"Liga sin cupón / directo"};
+async function cargarStats(){
+  statsData = null; statsErr = ""; render();
+  const dias = {hoy:0, ayer:1, "7":6, "30":29}[statsR] ?? 0, ahora = Date.now();
+  const d1 = statsR==="ayer" ? mxDia(new Date(ahora-864e5)) : mxDia(new Date(ahora));
+  const d0 = mxDia(new Date(ahora - dias*864e5));
+  const agg = {};
+  try{
+    const s = await getDocs(query(collection(db,"stats"), where(documentId(),">=",d0), where(documentId(),"<=",d1)));
+    s.forEach(x=>{ const f = x.data().f || {}; for(const src in f){ agg[src] = agg[src] || {}; for(const p in f[src]) agg[src][p] = (agg[src][p]||0) + (+f[src][p]||0); } });
+  }catch(e){ statsErr = "No se pudieron cargar los datos. Revisa que ya publicaste las reglas nuevas de Firebase."; }
+  statsData = {agg, d0, d1}; if(sel.view==="stats") render();
+}
+function embudo(o){
+  const base = o.visita || 0;
+  return PASOS.map(([k,n],i)=>{ const v = o[k]||0, pc = base ? Math.round(v*100/base) : 0;
+    return `<div class="fun"><div class="funl"><span>${n}</span><b>${v}${i?` <small>${pc}%</small>`:""}</b></div><div class="funb"><i style="width:${base?Math.max(v?3:0,pc):0}%"></i></div></div>`; }).join("");
+}
+function statsView(){
+  const R = [["hoy","Hoy"],["ayer","Ayer"],["7","7 días"],["30","30 días"]];
+  const head = `<div class="crumb"><button class="sec" data-home>← Inicio</button><div><b>Visitas y conversión</b></div></div>
+    <div class="evb" style="margin-bottom:10px">${R.map(([k,n])=>`<button class="${statsR===k?"go":"sec"}" data-sr="${k}">${n}</button>`).join("")}</div>`;
+  if(!statsData) return head + `<p class="empty">Cargando…</p>`;
+  const tot = {}; let cerr = 0;
+  for(const src in statsData.agg){ for(const p in statsData.agg[src]){ if(p==="cerrada") cerr += statsData.agg[src][p]; else tot[p] = (tot[p]||0) + statsData.agg[src][p]; } }
+  const srcs = Object.keys(statsData.agg).sort((a,b)=>((statsData.agg[b].visita||0)-(statsData.agg[a].visita||0)));
+  const conv = o => o.visita ? (Math.round((o.pedido||0)*1000/o.visita)/10)+"%" : "—";
+  return head + (statsErr?`<p class="err">${esc(statsErr)}</p>`:"") + `
+    <p class="hint">Solo app de domicilio. Cada celular cuenta una vez al día en cada paso. Tus celulares con el panel abierto no cuentan.</p>
+    <section class="blk"><h2>Total · conversión ${conv(tot)}</h2>${tot.visita ? embudo(tot) : `<p class="empty">Todavía no hay visitas en este periodo.</p>`}
+      ${cerr ? `<p class="hint" style="margin-top:10px">🔒 <b>${cerr}</b> ${cerr===1?"persona intentó":"personas intentaron"} pedir con la tienda cerrada.</p>`:""}</section>
+    ${srcs.length>1 || (srcs.length===1 && srcs[0]!=="DIRECTO") ? `<section class="blk"><h2>¿De dónde vienen?</h2>${srcs.map(s=>{ const o = statsData.agg[s];
+      return `<div class="srcc"><b>${esc(FUENTES[s]||("Cupón "+s))}</b><small>${o.visita||0} ${(o.visita||0)===1?"visita":"visitas"} · ${o.carrito||0} al carrito · ${o.pedido||0} ${(o.pedido||0)===1?"pedido":"pedidos"} · conversión ${conv(o)}</small></div>`; }).join("")}</section>` : ""}`;
 }
 // ===== Historial: descargar en Excel y vaciar =====
 let hist = null; // {desde, hasta, docs:[...], descargado:false, borrando:false, msg:""}
@@ -861,7 +902,7 @@ function fitText(c,t,x,y,max){ let s = 46; while(c.measureText(t).width > max &&
 onAuthStateChanged(auth, u=>{
   const ok = u && u.email === EMAIL;
   $("#login").hidden = ok; $("#panel").hidden = !ok;
-  if(ok){ listenEventos(); listenPedidos(); listenConfig(); render(); }
+  if(ok){ store.set("nf_staff","1"); listenEventos(); listenPedidos(); listenConfig(); render(); if(sel.view==="stats") cargarStats(); }
   else { unsubEv && unsubEv(); unsubPed && unsubPed(); unsubEv = unsubPed = null; known = null; pedidos = []; eventos = []; }
 });
 $("#loginForm").addEventListener("submit", async e=>{
@@ -943,7 +984,8 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.cupqr){ cupQR = cupQR===t.dataset.cupqr ? null : t.dataset.cupqr; render(); }
   else if(t.dataset.cupusos){ const k = t.dataset.cupusos; t.textContent = "Contando…";
     try{ const sn = await getDocs(query(collection(db,"pedidos"), where("cupon","==",k))); cupUsos[k] = sn.docs.filter(d=>d.data().estado!=="cancelado").length; }catch{ cupUsos[k] = 0; } render(); }
-  else if(t.dataset.view){ if(t.dataset.view==="historial") hist = null; go({view:t.dataset.view}); }
+  else if(t.dataset.view){ if(t.dataset.view==="historial") hist = null; go({view:t.dataset.view}); if(t.dataset.view==="stats") cargarStats(); }
+  else if(t.dataset.sr){ statsR = t.dataset.sr; cargarStats(); }
   else if(t.dataset.rango){ domRango = t.dataset.rango; known = null; listenPedidos(); render(); }
   else if(t.dataset.hq){
     const now = new Date(); let a, b;

@@ -179,7 +179,7 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 <script src="menu.js?v=27"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, setDoc, increment, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDP3ZypMhSahfx-e1KEsSh6rsy4IIJakiU",
@@ -276,6 +276,18 @@ if(F && !E){
   catch{ E = "__sin_evento__"; sinEvento = true; }
 }
 let mode = E ? "evento" : "domicilio", evento = null, eventoOk = !E;
+// ===== Contador de visitas (embudo): cada celular cuenta 1 vez al día por paso =====
+const HOY_MX = new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City"}).format(new Date());
+const FUENTE = (QS.get("c")||"DIRECTO").toUpperCase().replace(/[^A-Z0-9_]/g,"").slice(0,20) || "DIRECTO";
+function stat(paso){
+  try{
+    if(mode!=="domicilio" || localStorage.getItem("nf_staff")) return;
+    const k = "nf_st_"+HOY_MX; const s = JSON.parse(localStorage.getItem(k)||"{}");
+    if(s[paso]) return; s[paso] = 1; localStorage.setItem(k, JSON.stringify(s));
+    for(let i=localStorage.length-1;i>=0;i--){ const x = localStorage.key(i); if(x && x.startsWith("nf_st_") && x!==k) localStorage.removeItem(x); }
+  }catch{}
+  setDoc(doc(db,"stats",HOY_MX), {f:{[FUENTE]:{[paso]:increment(1)}}}, {merge:true}).catch(()=>{});
+}
 const $ = s => document.querySelector(s);
 const money = n => "$" + n.toLocaleString("es-MX");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -313,6 +325,7 @@ function tiendaAbierta(){
   return {abierta:false, msg:"Por ahora no tenemos horario disponible."};
 }
 function cerradoSheet(){
+  stat("cerrada");
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Estamos cerrados</h3><p class="desc" style="font-size:15px;margin-top:8px">${esc(tiendaAbierta().msg||"")} Vuelve a intentarlo en nuestro horario. ¡Te esperamos!</p>`);
 }
 function listenConfig(){
@@ -398,6 +411,7 @@ function openItem(id){
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
   const i = ITEMS.find(x=>x.id===id);
   if(MARCAS[i.marca] && MARCAS[i.marca].alcohol && !store.get("nf_18")) return ageSheet(i.marca);
+  stat("producto");
   if(isAgotado(i.id)) return openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>${i.name}</h3><p class="desc" style="font-size:15px;margin-top:8px">Por ahora se nos terminó esta bebida. Elige otra del menú, ¡hay muchas más!</p>`);
   const g = i.groups.map((gr,gi)=>{ const first = gr.opts.findIndex(o=>!isAgotado(i.id,o)); return `<div class="grp"><b>${gr.name}</b><div class="opts">${
     gr.opts.map((o,oi)=>{ const ag = isAgotado(i.id,o); return `<label class="opt${ag?" off":""}"><input type="radio" name="g${gi}" id="g${gi}o${oi}" value="${esc(o)}" ${oi===first?"checked":""} ${ag?"disabled":""}><span>${o}${ag?" · agotado":""}</span></label>`; }).join("")}</div></div>`; }).join("");
@@ -413,6 +427,7 @@ function openItem(id){
     <div style="margin-top:18px"><button class="primary" data-add="${i.id}">${mode==="evento"?"Pedir esta bebida":"Agregar al pedido"}</button></div>`);
 }
 function addItem(id){
+  stat("carrito");
   const i = ITEMS.find(x=>x.id===id);
   const big = document.querySelector('input[name="size"]:checked')?.value==="1";
   const sinAlc = !!(i.sinAlcohol && $("#sinAlc")?.checked);
@@ -432,6 +447,7 @@ function upsell(line){
 }
 let ubic = null, compData = "";
 function openCart(){
+  if(cart.length) stat("checkout");
   const rows = cart.map((l,k)=>`<div class="row"><div><b>${l.qty}× ${l.name}${l.size?` (${l.size})`:""}</b>
      <small>${[...l.choices, l.note && ("Nota: "+esc(l.note))].filter(Boolean).join(" · ")}</small>
      <button class="rm" data-rm="${k}">Quitar</button></div><div>${mode==="domicilio"?money(l.qty*l.unit):""}</div></div>`).join("");
@@ -598,6 +614,7 @@ async function send(){
     mine.unshift({id:ref.id, t:Date.now()}); mine = mine.slice(0,10); saveMine();
     data[ref.id] = {id:ref.id, ...orden, creado:null};
     if(orden.cupon){ store.del("nf_cupon"); cuponAplicado = ""; setModeUI(); renderMenu(); }
+    stat("pedido");
     cart = []; ubic = null; compData = ""; showStatus(ref.id);
   }catch(e){
     btn.disabled = false; btn.textContent = "Enviar pedido";
@@ -746,7 +763,7 @@ document.addEventListener("change", async e=>{
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSheet(); });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && pendingBeep){ pendingBeep = false; setTimeout(()=>ring(), 400); } });
 
-setModeUI(); renderBrand(); renderChips(); renderMenu(); renderCart(); loadEvento(); listenConfig();
+setModeUI(); renderBrand(); renderChips(); renderMenu(); renderCart(); loadEvento(); listenConfig(); stat("visita");
 loadMine(); mine.forEach(m=>track(m.id));
 autoOpen = mine[0]?.id || null;
 
