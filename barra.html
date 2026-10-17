@@ -14,7 +14,7 @@
 <title>Barra Nano's Fizz</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
-<script src="menu.js?v=27"></script>
+<script src="menu.js?v=28"></script>
 <style>
 [hidden]{display:none!important}
 /* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
@@ -473,7 +473,7 @@ function homeView(){
     <section class="blk">
       <h2>Domicilio</h2>
       <p class="hint" style="margin:0 0 8px">${tiendaTxt()}</p>
-      <div class="evb"><button class="go dom" data-cola="domicilio" data-b="0">Pedidos a domicilio</button></div>
+      <div class="evb"><button class="go dom" data-cola="domicilio" data-b="0">Pedidos a domicilio</button><a class="sec" href="repartidor.html" style="flex:1 1 140px">🛵 Página del repartidor</a></div>
     </section>
     <section class="blk">
       <h2>QR fijos de las barras</h2>
@@ -487,7 +487,7 @@ function homeView(){
 let statsR = "hoy", statsData = null, statsErr = "";
 const mxDia = d => new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City"}).format(d);
 const PASOS = [["visita","Entraron a la app"],["producto","Abrieron una bebida"],["carrito","Agregaron al carrito"],["checkout","Abrieron su pedido"],["pedido","Enviaron pedido"]];
-const FUENTES = {PRIMERA:"Anuncio y estados (PRIMERA)", VASO:"Calcomanía del vaso (VASO)", IMAN:"Imán de refri (IMAN)", NANOS20:"Calcomanía 20% (NANOS20)", DIRECTO:"Liga sin cupón / directo"};
+const FUENTES = {PRIMERA:"Anuncio de Facebook (PRIMERA)", ESTADO:"Estados de WhatsApp (ESTADO)", VASO:"Calcomanía del vaso (VASO)", IMAN:"Imán de refri (IMAN)", NANOS20:"Calcomanía 20% (NANOS20)", DIRECTO:"Liga sin cupón / directo", APP:"Ícono en su pantalla de inicio"};
 async function cargarStats(){
   statsData = null; statsErr = ""; render();
   const dias = {hoy:0, ayer:1, "7":6, "30":29}[statsR] ?? 0, ahora = Date.now();
@@ -686,12 +686,14 @@ function card(p){
     <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
       ${(it.opciones||[]).includes("🚫 SIN ALCOHOL")?`<div class="sinalc">🚫 SIN ALCOHOL</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
+    ${p.modo==="evento" && p.total>0 ? `<div style="margin-top:10px;background:#ff3b4e;color:#fff;border-radius:10px;padding:8px 10px;font-weight:800">💵 COBRAR ${money(p.total)} · costo extra, no incluido en el evento</div>` : ""}
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
       ${p.ubicacion&&p.ubicacion.lat?`<div><a class="maplnk" href="https://www.google.com/maps/search/?api=1&query=${p.ubicacion.lat},${p.ubicacion.lng}" target="_blank" rel="noopener">🗺️ Abrir ubicación en Maps</a> ${(p.ubicacion.prec||0)>300?`<small style="color:#ffb020">⚠️ imprecisa (±${Math.round(p.ubicacion.prec/1000)} km): guíate por la dirección</small>`:`<small>(±${p.ubicacion.prec||"?"} m)</small>`}</div>`:`<div><small>Sin ubicación GPS, usar dirección escrita</small></div>`}
       <div>🛵 ${(p.items||[]).reduce((a,it)=>a+(it.cant||1),0)>=2?"Envío <b>gratis</b>":"Envío <b>$20</b> (ya incluido)"}</div>
       ${p.cupon?`<div class="cuptag">🏷️ Cupón <b>${esc(p.cupon)}</b> · −${money(p.descuento||0)}${cupRepetido(p)}</div>`:""}
       <div>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":" · ya pagado"}</div>
+      ${p.rep?`<div style="color:var(--neon);font-weight:800">🛵 ${esc(p.rep.por)} · ${({asignado:"va por el pedido",camino:"en camino",llego:"ya llegó con el cliente",entregado:"entregó"})[p.rep.fase]||""}</div>`:""}
       ${p.estado==="nuevo"&&p.pago==="Transferencia"?`<div class="nocomp">Revisa en tu banco que llegó el pago antes de preparar</div>`:""}
       ${p.pago==="Transferencia"?(p.comprobante?`<button class="compbtn" data-comp="${p.id}"><img src="${p.comprobante}" alt="Comprobante"><span>Ver comprobante</span></button>`:`<div class="nocomp">⚠️ Sin comprobante todavía</div>`):""}</div>`:""}
     ${p.estado==="cancelado"?`<div class="tagbad">❌ Cancelado · ${esc(p.cancelMotivo||"sin motivo")}</div><div class="acts"><button class="back" data-id="${p.id}" data-to="nuevo">Reactivar pedido</button></div>`:""}

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#140a2e">
+<link rel="icon" type="image/png" href="icon-barra.png">
+<link rel="apple-touch-icon" href="icon-barra.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Repartidor">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="robots" content="noindex">
+<title>Repartidor Nano's Fizz</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+[hidden]{display:none!important}
+/* Repartidor: lista de pedidos listos arriba; en entrega, mapa a pantalla casi completa con la siguiente vuelta y botones grandes abajo */
+:root{--bg:#140a2e;--panel:#21124a;--panel2:#2c1a5e;--line:#3f2a7a;--fg:#f3edff;--muted:#b9a9e6;--neon:#7dff3a;--pink:#ff4fb8;--gold:#ffc53d;--blue:#4aa8ff;
+--display:"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;--body:"Nunito",system-ui,-apple-system,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg);height:100%}
+body{margin:0;font-family:var(--body);font-size:15px;padding-top:env(safe-area-inset-top,0px)}
+body.flash{animation:fl 1s steps(2) 8}@keyframes fl{50%{background:#3b1468}}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:0 40px}
+.top{display:flex;align-items:center;gap:10px;padding-block:12px 8px;flex-wrap:wrap}
+.top h1{font-family:var(--display);font-weight:400;font-size:24px;margin:0;color:var(--neon);flex:1;min-width:0}
+.btn,.sec{all:unset;cursor:pointer;font-weight:800;font-size:13px;padding:9px 12px;border-radius:10px;border:1.5px solid var(--line);text-align:center}
+.btn[aria-pressed="true"]{border-color:var(--neon);color:var(--neon)}
+h2{font-family:var(--display);font-weight:400;font-size:21px;color:var(--gold);margin:16px 0 10px}
+.card{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--gold);border-radius:16px;padding:14px;margin-bottom:12px;display:grid;gap:8px}
+.card.lista{border-left-color:var(--pink)}
+.card .h{display:flex;gap:12px;align-items:center}
+.card .n{font-family:var(--display);font-size:34px;line-height:1;color:var(--gold);font-variant-numeric:tabular-nums}
+.card .w{min-width:0}.card .w b{display:block;font-size:17px;overflow-wrap:anywhere}.card .w small{color:var(--muted);font-weight:700}
+.info{font-size:14px;line-height:1.55;overflow-wrap:anywhere}
+.go{all:unset;cursor:pointer;box-sizing:border-box;text-align:center;font-weight:800;font-size:17px;padding:15px;border-radius:14px;background:var(--neon);color:#1a0b3a;display:block}
+.go.pink{background:var(--pink);color:#fff}.go.gold{background:var(--gold)}.go.blue{background:var(--blue);color:#06142b}
+.go[disabled],.go.off{opacity:.45;pointer-events:none}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.empty{color:var(--muted);text-align:center;padding:26px 10px}
+.hint{color:var(--muted);line-height:1.5;font-size:13.5px}
+.tag{font-size:12px;font-weight:800;border-radius:6px;padding:2px 8px;background:var(--panel2)}
+.tag.prep{color:var(--gold)}.tag.lista{background:var(--pink);color:#fff}
+.login{max-width:360px;margin:12vh auto 0;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;text-align:center}
+.login h1{font-family:var(--display);font-weight:400;color:var(--neon);margin:10px 0 4px}
+.login p{color:var(--muted);margin:0 0 16px}
+.login input{width:100%;background:var(--bg);border:1.5px solid var(--line);color:var(--fg);border-radius:10px;padding:12px;font:inherit;margin-bottom:12px}
+.err{color:var(--pink);font-weight:700;font-size:13px;min-height:1em;margin:0}
+/* Modo entrega */
+#ruta{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);z-index:5;padding-top:env(safe-area-inset-top,0px)}
+.turn{display:flex;align-items:center;gap:12px;background:#0f7a3a;color:#fff;padding:12px 16px;min-height:74px}
+.turn .ic{font-size:40px;line-height:1;width:44px;text-align:center}
+.turn .tx{min-width:0;flex:1}
+.turn .tx b{display:block;font-size:20px;line-height:1.15;overflow-wrap:anywhere}
+.turn .tx small{font-size:14px;opacity:.9;font-weight:700}
+.turn.wait{background:var(--panel2)}
+#map{flex:1;min-height:200px}
+.eta{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 16px;background:var(--panel);font-weight:800;font-size:15px}
+.eta b{color:var(--neon);font-size:22px;font-family:var(--display);font-weight:400}
+.dock{background:var(--panel);padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px));display:grid;gap:8px;border-top:1px solid var(--line)}
+.dock .who{font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.dock .who b{font-size:16px}
+.small{all:unset;cursor:pointer;font-weight:800;font-size:13px;color:var(--muted);text-align:center;padding:6px}
+.gps{font-size:12px;font-weight:800;color:var(--muted)}.gps.ok{color:var(--neon)}.gps.bad{color:var(--pink)}
+.leaflet-container{background:#1b1240}
+.pin{font-size:30px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.6))}
+.me{width:22px;height:22px;border-radius:50%;background:var(--blue);border:4px solid #fff;box-shadow:0 0 0 6px rgba(74,168,255,.35)}
+@media (prefers-reduced-motion:reduce){body.flash{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section id="login" class="login">
+  <img src="logo.png" alt="" style="width:90px;height:90px">
+  <h1>Repartidor</h1>
+  <p>Entra con la contraseña de la barra.</p>
+  <form id="loginForm">
+    <input id="rname" autocomplete="name" placeholder="Tu nombre (lo ve el cliente)" maxlength="30" required>
+    <input id="pass" type="password" autocomplete="current-password" placeholder="Contraseña de la barra" required>
+    <button class="go" id="loginBtn" type="submit" style="width:100%">Entrar</button>
+    <p class="err" id="loginErr"></p>
+  </form>
+</section>
+<section id="panel" hidden>
+  <div class="top">
+    <img src="logo.png" alt="" style="width:42px;height:42px">
+    <h1>Repartidor</h1>
+    <button class="btn" id="soundBtn" aria-pressed="false">🔕 Activar sonido</button>
+    <button class="btn" id="outBtn">Salir</button>
+  </div>
+  <p class="hint" id="hola"></p>
+  <main id="main"></main>
+</section>
+</div>
+<section id="ruta" hidden>
+  <div class="turn wait" id="turn"><div class="ic">🛵</div><div class="tx"><b>Calculando ruta…</b><small>Activa la ubicación si te la pide</small></div></div>
+  <div id="map"></div>
+  <div class="eta"><span id="etaTxt">—</span><span class="gps" id="gps">GPS…</span></div>
+  <div class="dock" id="dock"></div>
+</section>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, setDoc, Timestamp, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyDP3ZypMhSahfx-e1KEsSh6rsy4IIJakiU",
+  authDomain: "nanos-fizz.firebaseapp.com",
+  projectId: "nanos-fizz",
+  storageBucket: "nanos-fizz.firebasestorage.app",
+  messagingSenderId: "567480397409",
+  appId: "1:567480397409:web:a4c5e7fb65ba931ae00420"
+});
+const db = getFirestore(app), auth = getAuth(app);
+const EMAIL = "barra@nanosfizz.app";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = n => "$" + Number(n||0).toLocaleString("es-MX");
+const store = { get(k){ try{return localStorage.getItem(k)}catch{return null} }, set(k,v){ try{localStorage.setItem(k,v)}catch{} } };
+let yo = store.get("nf_rep") || "";
+let pedidos = [], unsub = null, known = null, activo = null; // activo = id del pedido en entrega
+
+// ===== Sonido (WAV generado: suena aunque el iPhone esté en silencio) =====
+function makeChime(){
+  const sr=22050, notes=[988,1319,1568,1319,1568,2093], dur=.22, gap=.04, reps=3, pause=.35;
+  const one=notes.length*(dur+gap), total=reps*one+(reps-1)*pause, n=Math.floor(total*sr), data=new Int16Array(n);
+  for(let r=0;r<reps;r++){ const off=r*(one+pause); notes.forEach((f,k)=>{ const st=Math.floor((off+k*(dur+gap))*sr), len=Math.floor(dur*sr);
+    for(let i=0;i<len&&st+i<n;i++){ const t=i/sr, env=Math.min(1,i/200)*Math.exp(-3*t); const v=Math.sin(2*Math.PI*f*t)+.5*Math.sin(4*Math.PI*f*t)+.25*Math.sign(Math.sin(2*Math.PI*f*t)); data[st+i]=Math.max(-32767,Math.min(32767,v*env*20000)); } }); }
+  const buf=new ArrayBuffer(44+n*2), dv=new DataView(buf), w=(o,s)=>{for(let i=0;i<s.length;i++) dv.setUint8(o+i,s.charCodeAt(i));};
+  w(0,"RIFF"); dv.setUint32(4,36+n*2,true); w(8,"WAVE"); w(12,"fmt "); dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
+  dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true); w(36,"data"); dv.setUint32(40,n*2,true);
+  new Int16Array(buf,44).set(data); return URL.createObjectURL(new Blob([buf],{type:"audio/wav"}));
+}
+const chime = new Audio(makeChime()); chime.preload = "auto"; let soundOn = false;
+function unlockSound(){ try{ chime.muted=true; const p=chime.play(); const d=()=>{chime.pause();chime.currentTime=0;chime.muted=false;}; p&&p.then?p.then(d).catch(()=>{chime.muted=false}):d(); }catch{} }
+function ring(){ if(soundOn){ try{ chime.currentTime=0; chime.play().catch(()=>{}); }catch{} } try{ navigator.vibrate&&navigator.vibrate([400,150,400,150,700]); }catch{}
+  document.body.classList.add("flash"); setTimeout(()=>document.body.classList.remove("flash"),8000); }
+let wake = null; async function keepAwake(){ try{ wake = await navigator.wakeLock?.request("screen"); }catch{} }
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible"){ if(soundOn||activo) keepAwake(); if(activo) startGPS(); } });
+
+// ===== Pedidos =====
+const FASE = {asignado:"Va por el pedido", camino:"En camino", llego:"Llegó"};
+function listen(){
+  unsub && unsub();
+  const q = query(collection(db,"pedidos"), where("creado",">=",Timestamp.fromMillis(Date.now()-14*3600*1000)));
+  unsub = onSnapshot(q, snap=>{
+    pedidos = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(p=>p.evento==="domicilio" && p.estado!=="cancelado")
+      .sort((a,b)=>(a.creado?.toMillis?.()||Date.now())-(b.creado?.toMillis?.()||Date.now()));
+    const libres = new Set(pedidos.filter(p=>p.estado!=="entregado" && !p.rep).map(p=>p.id));
+    if(known && [...libres].some(id=>!known.has(id))) ring();
+    known = libres;
+    const mio = pedidos.find(p=>p.rep && p.rep.por===yo && p.estado!=="entregado");
+    if(mio && !activo){ activo = mio.id; abrirRuta(); }
+    if(activo){ const p = pedidos.find(x=>x.id===activo); if(!p || p.estado==="entregado" || p.estado==="cancelado" || (p.rep && p.rep.por!==yo)) cerrarRuta(); else renderDock(p); }
+    render();
+  }, ()=>{ $("#main").innerHTML = `<p class="empty">Sin conexión. Revisa tu internet.</p>`; });
+}
+function cardHTML(p, libre){
+  const items = (p.items||[]).map(i=>`${i.cant}× ${esc(i.nombre)}`).join(", ");
+  const est = p.estado==="lista" ? `<span class="tag lista">Listo para llevar</span>` : `<span class="tag prep">${p.estado==="nuevo"?"Recién llegó":"Preparándose"}</span>`;
+  const rep = p.rep ? `<span class="tag">🛵 ${esc(p.rep.por)} · ${FASE[p.rep.fase]||""}</span>` : "";
+  return `<article class="card ${p.estado}">
+    <div class="h"><div class="n">${esc(p.numero)}</div><div class="w"><b>${esc(p.nombre)}</b><small>${est} ${rep}</small></div></div>
+    <div class="info">📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}<br>🥤 ${items}<br>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · lleva cambio":p.pago==="Tarjeta al recibir"?" · lleva terminal":" · ya pagado"}
+    ${p.ubicacion&&p.ubicacion.lat&&(p.ubicacion.prec||0)<=300?"":`<br><small style="color:var(--gold)">⚠️ Sin ubicación GPS del cliente: la ruta se busca por la dirección.</small>`}</div>
+    ${libre?`<button class="go${p.estado==="lista"?" pink":""}" data-acepta="${p.id}">Aceptar este pedido</button>`:""}
+  </article>`;
+}
+function render(){
+  if(activo) return;
+  const libres = pedidos.filter(p=>p.estado!=="entregado" && !p.rep);
+  const otros = pedidos.filter(p=>p.estado!=="entregado" && p.rep && p.rep.por!==yo);
+  $("#main").innerHTML = `<h2>Pedidos por entregar</h2>
+    ${libres.length ? libres.map(p=>cardHTML(p,true)).join("") : `<p class="empty">No hay pedidos por entregar. Te suena cuando llegue uno${soundOn?"":" (activa el sonido arriba)"}.</p>`}
+    ${otros.length ? `<h2>Los lleva otro repartidor</h2>${otros.map(p=>cardHTML(p,false)).join("")}` : ""}
+    <p class="hint">Deja esta página abierta mientras esperas pedidos. Al aceptar uno se abre el mapa con la ruta.</p>`;
+}
+
+// ===== Modo entrega: mapa, ruta y GPS =====
+let map = null, meMk = null, dstMk = null, line = null, route = null, stepIdx = 1, gpsId = null, pos = null, dest = null, lastSent = 0, lastSentPos = null, offCount = 0, lastRoute = 0, destTried = "";
+const R = 6371000, rad = x=>x*Math.PI/180;
+const dist = (a,b)=>{ const dLat=rad(b[0]-a[0]), dLng=rad(b[1]-a[1]); const h=Math.sin(dLat/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+const fmtD = m => m>=1000 ? (Math.round(m/100)/10)+" km" : (Math.max(10,Math.round(m/10)*10))+" m";
+
+function abrirRuta(){
+  $("#ruta").hidden = false; keepAwake();
+  if(!map){
+    map = L.map("map",{zoomControl:false, attributionControl:true}).setView([19.43,-99.13], 15);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19, attribution:"© OpenStreetMap"}).addTo(map);
+  } else setTimeout(()=>map.invalidateSize(), 50);
+  route = null; dest = null; destTried = ""; stepIdx = 1; lastRoute = 0;
+  const p = pedidos.find(x=>x.id===activo); if(p) renderDock(p);
+  startGPS();
+}
+function cerrarRuta(){
+  stopGPS(); activo = null; route = null; dest = null;
+  if(line){ map.removeLayer(line); line = null; } if(dstMk){ map.removeLayer(dstMk); dstMk = null; }
+  $("#ruta").hidden = true; render();
+}
+function startGPS(){
+  if(gpsId!==null || !navigator.geolocation) return;
+  gpsId = navigator.geolocation.watchPosition(onPos, e=>{ $("#gps").textContent = e.code===1 ? "Sin permiso de ubicación" : "Buscando GPS…"; $("#gps").className = "gps bad"; },
+    {enableHighAccuracy:true, maximumAge:3000, timeout:20000});
+}
+function stopGPS(){ if(gpsId!==null){ navigator.geolocation.clearWatch(gpsId); gpsId = null; } }
+async function onPos(g){
+  pos = [g.coords.latitude, g.coords.longitude];
+  const acc = Math.round(g.coords.accuracy||0);
+  $("#gps").textContent = `GPS ±${acc} m`; $("#gps").className = "gps " + (acc<=60?"ok":"bad");
+  if(!meMk){ meMk = L.marker(pos,{icon:L.divIcon({className:"",html:'<div class="me"></div>',iconSize:[22,22],iconAnchor:[11,11]})}).addTo(map); map.setView(pos,16); }
+  else meMk.setLatLng(pos);
+  const p = pedidos.find(x=>x.id===activo); if(!p) return;
+  if(!dest) await buscarDestino(p);
+  if(dest && (!route || offRoute() || Date.now()-lastRoute>90000)) await calcRuta();
+  avanzarPaso(); pintarEta();
+  enviarPos(p, acc);
+}
+async function buscarDestino(p){
+  if(p.ubicacion && p.ubicacion.lat && (p.ubicacion.prec||0)<=300){ dest = [p.ubicacion.lat, p.ubicacion.lng]; }
+  else if(destTried!==p.id){
+    destTried = p.id;
+    try{
+      const near = pos ? `&viewbox=${pos[1]-0.08},${pos[0]+0.08},${pos[1]+0.08},${pos[0]-0.08}&bounded=1` : "";
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx${near}&q=${encodeURIComponent(p.direccion)}`).then(r=>r.json());
+      if(r && r[0]) dest = [+r[0].lat, +r[0].lon];
+    }catch{}
+    if(!dest){ setTurn("📍","No encontré la dirección en el mapa","Usa el botón Waze de abajo"); return; }
+  }
+  if(dest && !dstMk) dstMk = L.marker(dest,{icon:L.divIcon({className:"",html:'<div class="pin">🏠</div>',iconSize:[30,30],iconAnchor:[15,28]})}).addTo(map);
+}
+async function calcRuta(){
+  if(!pos || !dest) return; lastRoute = Date.now();
+  try{
+    const u = `https://router.project-osrm.org/route/v1/driving/${pos[1]},${pos[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson&steps=true`;
+    const r = await fetch(u).then(r=>r.json());
+    if(!r.routes || !r.routes[0]) throw 0;
+    const rt = r.routes[0], pts = rt.geometry.coordinates.map(c=>[c[1],c[0]]);
+    const cum = [0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+dist(pts[i-1],pts[i]));
+    route = {pts, cum, total:cum[cum.length-1]||1, speed:(rt.distance/Math.max(1,rt.duration))||6, steps:rt.legs[0].steps}; stepIdx = 1; offCount = 0;
+    if(line) line.setLatLngs(pts); else line = L.polyline(pts,{color:"#4aa8ff",weight:7,opacity:.9}).addTo(map);
+    map.fitBounds(L.latLngBounds([pos,dest]).pad(.25));
+  }catch{
+    route = null;
+    if(line) line.setLatLngs([pos,dest]); else line = L.polyline([pos,dest],{color:"#4aa8ff",weight:5,dashArray:"8 8"}).addTo(map);
+    setTurn("🧭","Sin ruta por calles ahorita",`Destino a ${fmtD(dist(pos,dest))} en línea recta · usa Waze si lo necesitas`);
+  }
+}
+function nearestIdx(){ let bi=0, bd=Infinity; for(let i=0;i<route.pts.length;i++){ const d=dist(pos,route.pts[i]); if(d<bd){bd=d;bi=i;} } return [bi,bd]; }
+function offRoute(){ if(!route||!pos) return false; const [,d] = nearestIdx(); offCount = d>60 ? offCount+1 : 0; return offCount>=2 && Date.now()-lastRoute>15000; }
+const ICON = {left:"⬅️","slight left":"↖️","sharp left":"↩️",right:"➡️","slight right":"↗️","sharp right":"↪️",straight:"⬆️",uturn:"🔄"};
+const LADO = {left:"a la izquierda","slight left":"ligeramente a la izquierda","sharp left":"cerrado a la izquierda",right:"a la derecha","slight right":"ligeramente a la derecha","sharp right":"cerrado a la derecha",straight:"derecho",uturn:"en U"};
+function textoPaso(s){
+  const m = s.maneuver||{}, mod = m.modifier||"straight", calle = s.name ? ` en ${s.name}` : "";
+  switch(m.type){
+    case "arrive": return ["🏠","Llegaste a la casa del cliente"];
+    case "roundabout": case "rotary": case "roundabout turn": return ["🔄",`En la glorieta toma la ${m.exit||1}ª salida${calle}`];
+    case "fork": return [ICON[mod]||"⬆️",`En la bifurcación mantente ${LADO[mod]||""}${calle}`];
+    case "end of road": return [ICON[mod]||"⬆️",`Al final de la calle gira ${LADO[mod]||""}${calle}`];
+    case "merge": case "on ramp": case "off ramp": return [ICON[mod]||"⬆️",`Incorpórate ${LADO[mod]||""}${calle}`];
+    case "continue": case "new name": return mod==="straight"||!ICON[mod] ? ["⬆️",`Sigue derecho${calle}`] : [ICON[mod],`Sigue ${LADO[mod]}${calle}`];
+    default: return mod==="uturn" ? ["🔄",`Da vuelta en U${calle}`] : mod==="straight" ? ["⬆️",`Sigue derecho${calle}`] : [ICON[mod]||"⬆️",`Gira ${LADO[mod]||""}${calle}`];
+  }
+}
+function avanzarPaso(){
+  if(!route || !pos) return;
+  const st = route.steps;
+  while(stepIdx < st.length-1){ const loc = st[stepIdx].maneuver.location; if(dist(pos,[loc[1],loc[0]])<25) stepIdx++; else break; }
+  const s = st[Math.min(stepIdx, st.length-1)], loc = s.maneuver.location, [ic,tx] = textoPaso(s);
+  setTurn(ic, tx, "En " + fmtD(dist(pos,[loc[1],loc[0]])));
+}
+function restante(){ if(!route||!pos) return dest&&pos ? dist(pos,dest) : null; const [i] = nearestIdx(); return Math.max(0, route.total - route.cum[i]); }
+function etaMin(){ const r = restante(); if(r===null) return null; const v = route ? route.speed : 6; return Math.max(1, Math.round(r/v/60)); }
+function pintarEta(){ const r = restante(), m = etaMin(); $("#etaTxt").innerHTML = r===null ? "—" : `Llegas en <b>${m} min</b> · ${fmtD(r)}`; }
+function setTurn(ic, tx, sub){ $("#turn").className = "turn"; $("#turn").innerHTML = `<div class="ic">${ic}</div><div class="tx"><b>${esc(tx)}</b><small>${esc(sub||"")}</small></div>`; }
+function enviarPos(p, acc){
+  if(!p.rep || p.rep.fase==="llego") return;
+  const now = Date.now(), moved = lastSentPos ? dist(lastSentPos,pos) : 999;
+  if(now-lastSent < 8000 || (moved < 15 && now-lastSent < 30000)) return;
+  lastSent = now; lastSentPos = pos;
+  const r = restante();
+  setDoc(doc(db,"rastreo",p.id), {lat:+pos[0].toFixed(6), lng:+pos[1].toFixed(6), acc, t:serverTimestamp(), min: etaMin(), m: r===null?null:Math.round(r), dlat: dest?dest[0]:null, dlng: dest?dest[1]:null}).catch(()=>{});
+}
+function renderDock(p){
+  const f = p.rep?.fase || "asignado";
+  const tel = String(p.tel||"").replace(/\D/g,""), tel52 = tel.length===10 ? "52"+tel : tel;
+  const wa = `https://wa.me/${tel52}?text=${encodeURIComponent(`¡Hola ${p.nombre||""}! 🛵 Soy ${yo} de Nano's Fizz, ya llegué con tu pedido. Estoy afuera 🙌`)}`;
+  const waze = dest ? `https://waze.com/ul?ll=${dest[0]},${dest[1]}&navigate=yes` : `https://waze.com/ul?q=${encodeURIComponent(p.direccion||"")}&navigate=yes`;
+  const cobro = `💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · cambio":p.pago==="Tarjeta al recibir"?" · terminal":" · pagado"}`;
+  const btn = f==="asignado" ? `<button class="go gold" data-fase="camino">📦 Ya tengo el pedido · Salir</button>`
+    : f==="camino" ? `<button class="go pink" data-fase="llego">🚪 Ya llegué</button>`
+    : `<div class="row"><a class="go blue" href="tel:${tel}">📞 Llamar</a><a class="go" href="${wa}" target="_blank" rel="noopener">💬 WhatsApp</a></div><button class="go" data-entregado>✅ Entregado</button>`;
+  $("#dock").innerHTML = `<div class="who"><b>#${esc(p.numero)} · ${esc(p.nombre)}</b><br>📍 ${esc(p.direccion)}${p.ref?` (${esc(p.ref)})`:""}<br>${cobro}</div>
+    ${btn}
+    <div class="row"><a class="small" href="${waze}" target="_blank" rel="noopener">Abrir en Waze</a>${f!=="llego"?`<a class="small" href="tel:${tel}">📞 Llamar al cliente</a>`:`<button class="small" data-fase="camino">← Regresar a "en camino"</button>`}</div>
+    ${f==="asignado"?`<button class="small" data-soltar>Soltar pedido (que lo lleve otro)</button>`:""}`;
+}
+
+// ===== Acciones =====
+document.addEventListener("click", async e=>{
+  const t = e.target.closest("button,[data-acepta]"); if(!t) return;
+  if(t.id==="soundBtn"){ unlockSound(); soundOn = !soundOn; t.textContent = soundOn?"🔔 Sonido activado":"🔕 Activar sonido"; t.setAttribute("aria-pressed",soundOn); if(soundOn){ keepAwake(); ring(); } render(); }
+  else if(t.id==="outBtn"){ stopGPS(); signOut(auth); }
+  else if(t.dataset.acepta){
+    const p = pedidos.find(x=>x.id===t.dataset.acepta); if(!p || p.rep) return;
+    unlockSound(); t.disabled = true;
+    try{ await updateDoc(doc(db,"pedidos",p.id), {rep:{por:yo, fase:"asignado", t:Date.now()}}); activo = p.id; abrirRuta(); }
+    catch{ t.disabled = false; alert("No se pudo aceptar. Revisa tu internet."); }
+  }
+  else if(t.dataset.fase){
+    const p = pedidos.find(x=>x.id===activo); if(!p) return; t.disabled = true;
+    const up = {"rep.fase":t.dataset.fase, "rep.t":Date.now()};
+    if(t.dataset.fase==="camino" && p.estado!=="lista") up.estado = "lista";
+    try{ await updateDoc(doc(db,"pedidos",p.id), up); lastSent = 0; if(pos) enviarPos({...p, rep:{...p.rep, fase:t.dataset.fase}}, 0); }
+    catch{ t.disabled = false; alert("No se pudo actualizar. Revisa tu internet."); }
+  }
+  else if(t.dataset.entregado!==undefined){
+    t.disabled = true;
+    try{ await updateDoc(doc(db,"pedidos",activo), {estado:"entregado", "rep.fase":"entregado", "rep.t":Date.now()}); cerrarRuta(); }
+    catch{ t.disabled = false; alert("No se pudo marcar como entregado. Revisa tu internet."); }
+  }
+  else if(t.dataset.soltar!==undefined){
+    try{ await updateDoc(doc(db,"pedidos",activo), {rep:deleteField()}); cerrarRuta(); }catch{}
+  }
+});
+
+onAuthStateChanged(auth, u=>{
+  const ok = u && u.email===EMAIL && yo;
+  $("#login").hidden = !!ok; $("#panel").hidden = !ok;
+  if(ok){ $("#hola").textContent = `Hola ${yo} 👋 Activa el sonido para que te avise cuando haya pedidos.`; listen(); }
+  else { unsub && unsub(); unsub = null; known = null; pedidos = []; if(u && !yo) $("#loginErr").textContent = "Escribe tu nombre para continuar."; }
+});
+$("#rname").value = yo;
+$("#loginForm").addEventListener("submit", async e=>{
+  e.preventDefault(); const b = $("#loginBtn"); b.disabled = true; $("#loginErr").textContent = "";
+  yo = $("#rname").value.trim().slice(0,30); store.set("nf_rep", yo); store.set("nf_staff","1");
+  try{ await signInWithEmailAndPassword(auth, EMAIL, $("#pass").value); if(auth.currentUser) { $("#login").hidden = true; $("#panel").hidden = false; $("#hola").textContent = `Hola ${yo} 👋 Activa el sonido para que te avise cuando haya pedidos.`; listen(); } }
+  catch{ $("#loginErr").textContent = "Contraseña incorrecta. Revisa e intenta de nuevo."; }
+  b.disabled = false;
+});
+</script>
+</body>
+</html>

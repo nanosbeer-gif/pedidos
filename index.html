@@ -6,9 +6,10 @@
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Nano's Fizz">
+<meta name="apple-mobile-web-app-title" content="Nano's">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Nano's Fizz Pedidos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -104,6 +105,15 @@ textarea.t{min-height:60px;resize:vertical}
 .steps li{font-size:11.5px;font-weight:800;color:var(--muted);padding-top:10px;border-top:4px solid var(--line)}
 .steps li.pas{border-color:var(--pink);color:var(--fg)}
 .steps li.now{border-color:var(--neon);color:var(--neon)}
+.xbox{background:rgba(255,40,60,.12);border:2px solid #ff3b4e;color:#ff6b78;border-radius:14px;padding:12px 14px;margin:12px 0;font-weight:800;font-size:15px;line-height:1.45;text-align:left}
+.xbox b{color:#ff3b4e}
+.price.xtra{color:#ff6b78;font-size:18px;text-align:right;line-height:1.1}.price.xtra small{display:block;font-size:11px;font-weight:800}
+.steps.s5{grid-template-columns:repeat(5,1fr)}.steps.s5 li{font-size:10.5px}
+.rider{background:var(--panel2,#2c1a5e);border-radius:16px;padding:14px;margin-bottom:14px;font-weight:800;font-size:16px}
+.rider small{display:block;color:var(--muted);font-weight:700;font-size:13px;margin-top:4px}
+#cmap{height:260px;border-radius:16px;overflow:hidden;margin:0 0 14px;background:#1b1240}
+.cpin{font-size:32px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.6))}
+#riderEta{font-size:15px;margin:-4px 0 14px;font-weight:800}#riderEta b{color:var(--neon);font-size:20px}
 .mini{margin-top:16px;color:var(--muted);font-size:13.5px;line-height:1.6}
 .mrow{all:unset;cursor:pointer;box-sizing:border-box;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--panel2);border:1.5px solid var(--line);border-radius:14px;padding:10px 12px}
 .mrow:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
@@ -176,7 +186,7 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 <button class="wafab" id="waFab" data-wa hidden><svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path fill="currentColor" d="M12 3C6.9 3 3 6.6 3 11c0 2.3 1.1 4.4 2.9 5.9L5 21l4.3-2.1c.9.2 1.8.3 2.7.3 5.1 0 9-3.6 9-8.1S17.1 3 12 3zm-4 9.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg><span id="waTxt">WhatsApp</span></button>
 <div class="sheetbg" id="sheetBg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 
-<script src="menu.js?v=27"></script>
+<script src="menu.js?v=28"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, setDoc, increment, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -194,7 +204,7 @@ const EXTRA_LITRO = 30;
 
 const { MARCAS, CATS: ALLCATS, ITEMS, EXTRAS, FOTOS } = window.NF_MENU;
 let marca = "fizz", agotados = {}, tienda = null;
-const curCats = () => ALLCATS.filter(c=>c.marca===marca && !(c.soloDom && mode==="evento"));
+const curCats = () => ALLCATS.filter(c=>(c.marca===marca || c.todas) && !(c.soloDom && mode==="evento")).sort((a,b)=>(a.todas?1:0)-(b.todas?1:0));
 const marcasEvento = () => !E ? ["fizz"] : (evento && evento.marca==="ambos") ? ["fizz","beer"] : [(evento && evento.marca) || "fizz"];
 const isAgotado = (id, sabor) => !!agotados[sabor ? id+"|"+sabor : id];
 // Envío: $20 con 1 bebida; gratis desde 2 bebidas
@@ -278,7 +288,7 @@ if(F && !E){
 let mode = E ? "evento" : "domicilio", evento = null, eventoOk = !E;
 // ===== Contador de visitas (embudo): cada celular cuenta 1 vez al día por paso =====
 const HOY_MX = new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City"}).format(new Date());
-const FUENTE = (QS.get("c")||"DIRECTO").toUpperCase().replace(/[^A-Z0-9_]/g,"").slice(0,20) || "DIRECTO";
+const FUENTE = (QS.get("c")||(QS.get("app")?"APP":"DIRECTO")).toUpperCase().replace(/[^A-Z0-9_]/g,"").slice(0,20) || "DIRECTO";
 function stat(paso){
   try{
     if(mode!=="domicilio" || localStorage.getItem("nf_staff")) return;
@@ -374,10 +384,10 @@ function cupStyle(i){ const [a,b]=i.color.split(","); return `background:linear-
 function renderMenu(){
   const cats = cat==="todas" ? curCats() : curCats().filter(c=>c.id===cat);
   $("#menu").innerHTML = cats.map(c=>`<h2>${c.name}</h2><div class="list">${
-    ITEMS.filter(i=>i.cat===c.id && i.marca===marca).map(i=>`<button class="card${isAgotado(i.id)?" agot":""}" data-i="${i.id}">
+    ITEMS.filter(i=>i.cat===c.id && (i.marca===marca || c.todas)).map(i=>`<button class="card${isAgotado(i.id)?" agot":""}" data-i="${i.id}">
       ${FOTOS[i.id]?`<img class="ph" src="${FOTOS[i.id]}" alt="" loading="lazy">`:`<span class="cup" style="${cupStyle(i)}"><i></i></span>`}
       <div><div class="name">${i.name}</div><div class="desc">${i.desc}</div></div>
-      ${isAgotado(i.id)?`<span class="price agt">Agotado</span>`:mode==="domicilio"?`<span class="price">${precioHTML(i.price)}</span>`:`<span class="price" style="font-size:14px">Pedir</span>`}</button>`).join("")}</div>`).join("");
+      ${isAgotado(i.id)?`<span class="price agt">Agotado</span>`:mode==="domicilio"?`<span class="price">${precioHTML(i.price)}</span>`:i.extraEvento?`<span class="price xtra">+${money(i.extraEvento)}<small>extra</small></span>`:`<span class="price" style="font-size:14px">Pedir</span>`}</button>`).join("")}</div>`).join("");
 }
 function renderBrand(){
   const ms = marcasEvento(); if(!ms.includes(marca)) marca = ms[0];
@@ -407,7 +417,8 @@ function closeSheet(){ $("#sheetBg").hidden = true; }
 
 function openItem(id){
   if(mode==="evento" && !eventoOk) return closedSheet();
-  if(mode==="evento"){ const a = activeEvento(); if(a) return lockSheet(a); }
+  const xtra = mode==="evento" && ITEMS.find(x=>x.id===id)?.extraEvento;
+  if(mode==="evento" && !xtra){ const a = activeEvento(); if(a) return lockSheet(a); }
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
   const i = ITEMS.find(x=>x.id===id);
   if(MARCAS[i.marca] && MARCAS[i.marca].alcohol && !store.get("nf_18")) return ageSheet(i.marca);
@@ -416,6 +427,7 @@ function openItem(id){
   const g = i.groups.map((gr,gi)=>{ const first = gr.opts.findIndex(o=>!isAgotado(i.id,o)); return `<div class="grp"><b>${gr.name}</b><div class="opts">${
     gr.opts.map((o,oi)=>{ const ag = isAgotado(i.id,o); return `<label class="opt${ag?" off":""}"><input type="radio" name="g${gi}" id="g${gi}o${oi}" value="${esc(o)}" ${oi===first?"checked":""} ${ag?"disabled":""}><span>${o}${ag?" · agotado":""}</span></label>`; }).join("")}</div></div>`; }).join("");
   openSheet(`<button class="close" data-close>Cerrar ✕</button>${FOTOS[i.id]?`<img class="phbig" src="${FOTOS[i.id]}" alt="">`:""}<h3>${i.name}</h3><p class="desc">${i.desc}</p>
+    ${xtra?`<div class="xbox">💵 <b>Costo extra ${money(xtra)}</b> · no está incluido en el evento.<br>Recuerda pagar al recibirlas en la barra.</div>`:""}
     ${i.noSize?"":`<div class="grp"><b>Tamaño</b><div class="opts">
       <label class="opt"><input type="radio" name="size" id="s1" value="0" checked><span>½ litro${mode==="domicilio"?" · "+precioHTML(i.price):""}</span></label>
       <label class="opt"><input type="radio" name="size" id="s2" value="1"><span>1 litro${mode==="domicilio"?" · "+precioHTML(i.price+EXTRA_LITRO):""}</span></label>
@@ -424,7 +436,7 @@ function openItem(id){
     ${i.sinAlcohol?`<label class="sa" for="sinAlc"><input type="checkbox" id="sinAlc"><span><b>Sin alcohol</b><small>Márcala si la quieres sin alcohol</small></span></label>`:""}
     <label class="f" for="itemNote">¿Algo más? (opcional)<textarea class="t" id="itemNote" maxlength="120" placeholder="Ej. poco hielo, sin limón"></textarea></label>
     ${mode==="domicilio"?`<div class="qty"><button data-q="-1" aria-label="Menos">−</button><output id="q">1</output><button data-q="1" aria-label="Más">+</button></div>`:""}
-    <div style="margin-top:18px"><button class="primary" data-add="${i.id}">${mode==="evento"?"Pedir esta bebida":"Agregar al pedido"}</button></div>`);
+    <div style="margin-top:18px"><button class="primary" data-add="${i.id}">${xtra?`Pedir · pago ${money(xtra)} en barra`:mode==="evento"?"Pedir esta bebida":"Agregar al pedido"}</button></div>`);
 }
 function addItem(id){
   stat("carrito");
@@ -434,7 +446,7 @@ function addItem(id){
   const choices = (sinAlc ? ["🚫 SIN ALCOHOL"] : []).concat(i.groups.map((gr,gi)=>gr.name+": "+(document.querySelector(`input[name="g${gi}"]:checked`)?.value||"—")));
   const ex = mode==="domicilio" ? [...document.querySelectorAll('input[name="ex"]:checked')].map(x=>(EXTRAS[i.id]||[])[+x.value]).filter(Boolean) : [];
   ex.forEach(x=>choices.push(x.n+" (+"+money(x.p)+")"));
-  const line = {name:i.name,size:i.noSize?"":(big?"1 L":"½ L"),unit:(i.price||0)+(big&&!i.noSize?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};
+  const line = {name:i.name,size:i.noSize?"":(big?"1 L":"½ L"),unit:mode==="evento"?(i.extraEvento||0):(i.price||0)+(big&&!i.noSize?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};
   if(mode==="evento"){ cart = [line]; renderCart(); openCart(); return; }
   cart.push(line); renderCart(); upsell(line);
 }
@@ -462,7 +474,7 @@ function openCart(){
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Tu pedido <span class="badge">${mode==="evento"?"En el evento":"A domicilio"}</span></h3>
     ${rows}
     ${mode==="domicilio"?`<button class="ghost" data-close style="margin-top:10px">+ Agregar otra bebida</button>`:""}
-    ${mode==="domicilio"?`<div class="row"><div>Envío${envio()?`<small>¡Gratis pidiendo 2 bebidas o más!</small>`:""}</div><div>${envio()?money(envio()):"<b style='color:var(--neon)'>Gratis</b>"}</div></div>${cuponHTML()}<div class="total"><span>Total a pagar</span><span>${money(totalFinal())}</span></div>`:`<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`}
+    ${mode==="domicilio"?`<div class="row"><div>Envío${envio()?`<small>¡Gratis pidiendo 2 bebidas o más!</small>`:""}</div><div>${envio()?money(envio()):"<b style='color:var(--neon)'>Gratis</b>"}</div></div>${cuponHTML()}<div class="total"><span>Total a pagar</span><span>${money(totalFinal())}</span></div>`:(cart.some(l=>l.unit>0) ? `<div class="xbox" style="margin-top:12px">⚠️ <b>Este producto tiene costo extra de ${money(cart.reduce((a,l)=>a+l.unit*l.qty,0))}</b>: no está incluido en el evento. Págalo en la barra al recibirlo.</div>` : `<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`)}
     <div class="grp"><b>Tus datos</b>${datos}</div>
     ${mode==="domicilio"?`<div class="grp"><b>Pago</b><div class="opts">
       <label class="opt"><input type="radio" name="pago" id="p1" value="Efectivo" checked><span>Efectivo</span></label>
@@ -583,7 +595,7 @@ function askLocation(btn){
 async function send(){
   unlockSound();
   if(mode==="evento" && !eventoOk) return closedSheet();
-  if(mode==="evento"){ const a = activeEvento(); if(a) return lockSheet(a); }
+  if(mode==="evento" && !cart.some(l=>l.unit>0)){ const a = activeEvento(); if(a) return lockSheet(a); }
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
   const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
   if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
@@ -599,7 +611,7 @@ async function send(){
     tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
     items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note})),
-    total: mode==="domicilio"?totalFinal():0,
+    total: mode==="domicilio"?totalFinal():cart.reduce((a,l)=>a+(l.unit||0)*l.qty,0),
     cupon: mode==="domicilio" && cuponDe(cuponAplicado) ? cuponAplicado : "",
     descuento: mode==="domicilio" ? descuento() + (cuponDe(cuponAplicado)?.tipo==="envio" ? envioBase() : 0) : 0,
     evento: E || "domicilio", barra: E ? BARRA : 0,
@@ -624,7 +636,7 @@ async function send(){
 
 const PASOS = {
   evento:   [["nuevo","Recibido"],["preparando","Preparando"],["lista","¡Lista!"],["entregado","Entregada"]],
-  domicilio:[["nuevo","Recibido"],["preparando","Preparando"],["lista","En camino"],["entregado","Entregado"]]
+  domicilio:[["nuevo","Recibido"],["preparando","Preparando"],["asignado","Repartidor"],["camino","En camino"],["llego","Llegó"]]
 };
 const ESTADO_TXT = {nuevo:"En fila", preparando:"Preparando", lista:"¡Lista!", entregado:"Entregada", cancelado:"Cancelado"};
 const VIDA = 14*3600*1000; // los pedidos se guardan en el celular 14 horas
@@ -640,7 +652,7 @@ function loadMine(){
   saveMine();
 }
 function saveMine(){ store.set("nf_mis", JSON.stringify(mine.map(m=>({id:m.id,t:m.t})))); }
-function activeEvento(){ return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.evento===E && p.estado!=="entregado" && p.estado!=="cancelado"); }
+function activeEvento(){ return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.evento===E && !(p.total>0) && p.estado!=="entregado" && p.estado!=="cancelado"); }
 
 function track(id){
   if(watchers[id]) return;
@@ -654,6 +666,7 @@ function track(id){
     const prev = data[id], p = {id, ...snap.data()};
     data[id] = p;
     if(prev && prev.estado!=="lista" && p.estado==="lista"){ ring(); if(document.visibilityState!=="visible") pendingBeep = true; }
+    if(prev && p.rep && p.rep.fase==="llego" && (!prev.rep || prev.rep.fase!=="llego")){ ring("🚪 ¡Llegó tu pedido!"); if(document.visibilityState!=="visible") pendingBeep = true; }
     if(p.estado==="entregado" || p.estado==="cancelado"){ watchers[id](); delete watchers[id]; }
     if(viewing===id) renderStatus(p);
     else if(autoOpen===id && viewing===null && p.estado!=="entregado") showStatus(id);
@@ -682,8 +695,18 @@ function showStatus(id){
   track(id);
 }
 function renderStatus(p){ setTimeout(renderWA, 0);
-  const pasos = PASOS[p.modo]||PASOS.evento, idx = Math.max(0, pasos.findIndex(x=>x[0]===p.estado));
-  const big = p.estado==="lista"
+  const pasos = PASOS[p.modo]||PASOS.evento, fase = p.rep && p.rep.fase;
+  const idx = p.modo==="domicilio"
+    ? (p.estado==="entregado" ? 5 : fase==="llego" ? 4 : fase==="camino" || (p.estado==="lista" && !fase) ? 3 : fase==="asignado" ? 2 : p.estado==="preparando" ? 1 : 0)
+    : Math.max(0, pasos.findIndex(x=>x[0]===p.estado));
+  const repN = p.rep && p.rep.por ? esc(p.rep.por) : "Tu repartidor";
+  const big = p.modo==="domicilio" && p.estado!=="entregado" && p.estado!=="cancelado" && fase==="llego"
+      ? `<div class="ready">¡${repN} ya llegó! 🚪<span>Sal a recibir tu pedido · ten listo tu pago</span></div>`
+    : p.modo==="domicilio" && p.estado!=="entregado" && p.estado!=="cancelado" && fase==="camino"
+      ? `<div class="rider">🛵 ${repN} va en camino con tu pedido<small>Ten listo tu pago · aquí lo ves en vivo</small></div><div id="cmapWrap"></div><div id="riderEta">Esperando la ubicación del repartidor…</div>`
+    : p.modo==="domicilio" && p.estado!=="entregado" && p.estado!=="cancelado" && fase==="asignado"
+      ? `<div class="rider">🛵 ${repN} va por tu pedido<small>En cuanto salga, aquí verás su ubicación en vivo</small></div>`
+    : p.estado==="lista"
     ? (p.modo==="evento" ? `<div class="ready">¡Tu bebida está lista! 🥤<span>Pasa a la barra y di tu número</span></div>` : `<div class="ready">¡Tu pedido va en camino! 🛵<span>Ten listo tu pago</span></div>`)
     : p.estado==="entregado" ? `<div class="ready done">¡Disfrútala! 💜</div>`
     : p.estado==="cancelado" ? `<div class="ready cancel">Pedido cancelado<span>${esc(p.cancelMotivo||"")}${p.modo==="domicilio"?" · Si tienes dudas, escríbenos.":" · Puedes pedir otra bebida."}</span></div>`
@@ -692,14 +715,51 @@ function renderStatus(p){ setTimeout(renderWA, 0);
   $("#status").innerHTML = `<div class="st">
     <p class="lbl">Tu número</p><div class="num">${esc(p.numero)}</div><p class="who">${esc(p.nombre)}</p>
     ${big}
-    ${p.estado==="cancelado"?"":`<ol class="steps">`+pasos.map((s,k)=>`<li class="${k<idx?"pas":k===idx?"now":""}">${s[1]}</li>`).join("")+`</ol>`}
+    ${p.modo==="evento" && p.total>0 && p.estado!=="entregado" && p.estado!=="cancelado" ? `<div class="xbox">⚠️ <b>Recuerda que este producto tiene costo extra</b> y no está incluido en el evento. Paga <b>${money(p.total)}</b> en la barra al recibirlo.</div>` : ""}
+    ${p.estado==="cancelado"?"":`<ol class="steps${pasos.length===5?" s5":""}">`+pasos.map((s,k)=>`<li class="${k<idx?"pas":k===idx?"now":""}">${s[1]}</li>`).join("")+`</ol>`}
     <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)}${it.tam?` (${esc(it.tam)})`:""}</div>`).join("")}${p.modo==="domicilio"?`<div style="margin-top:6px"><b>Total: ${money(p.total||0)}</b> · ${esc(p.pago)}</div>`:""}</div>
     ${p.modo==="domicilio" && p.pago==="Transferencia" && p.estado!=="entregado" ? (p.comprobante ? `<p class="note" style="margin-top:12px">🧾 Comprobante recibido ✓</p>` : `<div style="margin-top:14px">${transferInfo()}<label class="primary" for="compLater" style="margin-top:10px">🧾 Subir comprobante</label><input type="file" id="compLater" data-order="${p.id}" accept="image/*" hidden><p class="note" id="compMsg"></p></div>`) : ""}
     ${(p.estado==="entregado"||p.estado==="cancelado")&&p.modo==="evento"?`<button class="primary" id="backBtn">Pedir otra bebida</button>`:`<button class="ghost" id="backBtn">Ver el menú</button>`}
     ${p.modo==="evento" && (p.estado==="lista"||p.estado==="entregado") ? `<button class="wabtn" style="margin-top:14px;width:100%" data-wa>${WA_ICON}<span>¿Te gustó? Contrátanos para tu evento</span></button>` : ""}
     ${p.modo==="domicilio" && p.estado!=="entregado" ? `<button class="wabtn" style="margin-top:14px;width:100%" data-wa>${WA_ICON}<span>Escríbenos sobre tu pedido</span></button>` : ""}
     ${p.modo==="evento"&&p.estado!=="entregado"?`<p class="note" style="margin-top:12px">Si cierras la página, tu pedido sigue guardado en "Mis pedidos".</p>`:""}
-  </div>`;
+  </div>`;  trackRider(p);
+}
+// ===== Repartidor en vivo (mapa para el cliente) =====
+let cmap = null, cmapEl = null, riderMk = null, homeMk = null, trkUnsub = null, trkId = null, trkData = null;
+const fmtD = m => m>=1000 ? (Math.round(m/100)/10)+" km" : Math.max(10,Math.round(m/10)*10)+" m";
+function loadLeaflet(){
+  if(window.L) return Promise.resolve();
+  if(loadLeaflet.p) return loadLeaflet.p;
+  return loadLeaflet.p = new Promise((res,rej)=>{
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(l);
+    const sc = document.createElement("script"); sc.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; sc.onload = res; sc.onerror = ()=>{ loadLeaflet.p = null; rej(); }; document.head.appendChild(sc);
+  });
+}
+function trackRider(p){
+  const on = p.modo==="domicilio" && p.rep && p.rep.fase==="camino" && p.estado!=="entregado" && p.estado!=="cancelado";
+  if(!on){ if(trkUnsub){ trkUnsub(); trkUnsub = null; } trkId = null; trkData = null; return; }
+  const w = $("#cmapWrap"); if(!w) return;
+  if(!cmapEl){ cmapEl = document.createElement("div"); cmapEl.id = "cmap"; }
+  w.appendChild(cmapEl);
+  loadLeaflet().then(()=>{
+    if(!cmap){ cmap = L.map(cmapEl,{zoomControl:false}).setView([19.43,-99.13],14); L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(cmap); }
+    setTimeout(()=>{ cmap.invalidateSize(); pintarRider(); }, 60);
+  }).catch(()=>{ cmapEl.style.display = "none"; });
+  if(trkId!==p.id){ trkUnsub && trkUnsub(); trkId = p.id; trkData = null; trkUnsub = onSnapshot(doc(db,"rastreo",p.id), s=>{ trkData = s.exists() ? s.data() : null; pintarRider(); }, ()=>{}); }
+  else pintarRider();
+}
+function pintarRider(){
+  const el = $("#riderEta");
+  if(!trkData){ if(el) el.textContent = "Esperando la ubicación del repartidor…"; return; }
+  if(el) el.innerHTML = trkData.min ? `Llega en aprox. <b>${trkData.min} min</b>${trkData.m?` · a ${fmtD(trkData.m)}`:""}` : "Tu repartidor va en camino";
+  if(!window.L || !cmap) return;
+  const rp = [trkData.lat, trkData.lng];
+  if(riderMk) riderMk.setLatLng(rp); else riderMk = L.marker(rp,{icon:L.divIcon({className:"",html:'<div class="cpin">🛵</div>',iconSize:[34,34],iconAnchor:[17,17]})}).addTo(cmap);
+  const home = trkData.dlat ? [trkData.dlat, trkData.dlng] : null;
+  if(home){ if(homeMk) homeMk.setLatLng(home); else homeMk = L.marker(home,{icon:L.divIcon({className:"",html:'<div class="cpin">🏠</div>',iconSize:[34,34],iconAnchor:[17,30]})}).addTo(cmap);
+    cmap.fitBounds(L.latLngBounds([rp,home]).pad(.35),{maxZoom:17}); }
+  else cmap.setView(rp,16);
 }
 function backToMenu(){
   viewing = null;
@@ -764,6 +824,7 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSheet(); });
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && pendingBeep){ pendingBeep = false; setTimeout(()=>ring(), 400); } });
 
 setModeUI(); renderBrand(); renderChips(); renderMenu(); renderCart(); loadEvento(); listenConfig(); stat("visita");
+if("serviceWorker" in navigator && !E) navigator.serviceWorker.register("sw.js").catch(()=>{});
 loadMine(); mine.forEach(m=>track(m.id));
 autoOpen = mine[0]?.id || null;
 
