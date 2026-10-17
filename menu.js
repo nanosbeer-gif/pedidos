@@ -1,4 +1,5 @@
 // ===== Menú de Nano's Fizz y Nano's Beer =====
+// Grupos con multi:true se eligen con casillas (varias opciones).
 // Para cambiar bebidas, sabores o precios, edita este archivo y súbelo a GitHub.
 window.NF_MENU = {
 MARCAS: {
@@ -29,7 +30,7 @@ ITEMS: [
   {marca:"fizz",id:"sangria",cat:"nano",name:"Sangría preparada",price:60,color:"#8a1030,#3a0614",desc:"Escarchada, bien fría.",groups:[]},
   {marca:"fizz",id:"mojito",cat:"mojitos",name:"Mojito natural",price:60,color:"#e9ffd6,#7fdc5a",desc:"Sprite, un toque de limón, azúcar, menta y hierbabuena.",groups:[{name:"Escarchado",opts:["Con dulce","Sin escarchar"]}]},
   {marca:"fizz",id:"mojitofr",cat:"mojitos",name:"Mojito frutos rojos",price:60,color:"#ff6b8a,#7a1036",desc:"Fresa, blueberry y frambuesa trituradas, sirope de frutos rojos, Sprite, limón, azúcar y hierbabuena.",groups:[]},
-  {marca:"fizz",id:"papas",cat:"botanas",name:"Papas locas",price:60,color:"#ff7a1a,#c2410c",desc:"Papas preparadas con chamoy, Jugo Maggi, salsas y limón. ¡Bien locas!",groups:[],noSize:true,extraEvento:60},
+  {marca:"fizz",id:"papas",cat:"botanas",name:"Papas locas",price:60,color:"#ff7a1a,#c2410c",desc:"Papas preparadas con chamoy, Jugo Maggi, salsas y limón. ¡Bien locas!",groups:[{name:"¿Qué ingredientes deseas en tus papas?",multi:true,opts:["Salsa botanera","Salsa Valentina","Salsa Maggi","Chamoy","Tajín","Limón","Más sal","Cacahuates japoneses"]}],noSize:true,extraEvento:60},
   {marca:"beer",id:"b_sola",cat:"cerveza",name:"Nano sola",desc:"Cerveza solo con limón y sal.",groups:[{name:"Escarchado",opts:["Ajonjolí","Miguelito"]}],noSize:true},
   {marca:"beer",id:"b_trad",cat:"cerveza",name:"Nano Tradicional",desc:"Con salsa Maggi, salsa inglesa, limón, sal y Tajín.",groups:[{name:"Escarchado",opts:["Ajonjolí","Miguelito"]},{name:"Banderilla",opts:["Gomitas","Tamarindo"]}],noSize:true},
   {marca:"beer",id:"b_clamato",cat:"cerveza",name:"Nano Clamato",desc:"Con Clamato, salsa Maggi, salsa inglesa, limón, sal y Tajín.",groups:[{name:"Escarchado",opts:["Ajonjolí","Miguelito"]},{name:"Banderilla",opts:["Gomitas","Tamarindo"]}],noSize:true},
