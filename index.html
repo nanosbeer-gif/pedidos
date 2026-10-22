@@ -164,6 +164,23 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 .waopt:active,.waopt:hover{border-color:#25d366}
 .waopt .ic{font-size:20px}.waopt span:nth-child(2){flex:1}.waopt .go2{color:#25d366;font-size:24px}
 </style>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1801843234387287');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1801843234387287&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 </head>
 <body>
 
@@ -290,7 +307,20 @@ let mode = E ? "evento" : "domicilio", evento = null, eventoOk = !E;
 // ===== Contador de visitas (embudo): cada celular cuenta 1 vez al día por paso =====
 const HOY_MX = new Intl.DateTimeFormat("en-CA",{timeZone:"America/Mexico_City"}).format(new Date());
 const FUENTE = (QS.get("c")||(QS.get("app")?"APP":"DIRECTO")).toUpperCase().replace(/[^A-Z0-9_]/g,"").slice(0,20) || "DIRECTO";
+// Eventos para Meta Pixel (solo domicilio y nunca el personal): producto=ViewContent, carrito=AddToCart, checkout=InitiateCheckout, pedido=Purchase
+function pxEv(paso){
+  try{
+    if(typeof fbq!=="function" || mode!=="domicilio" || localStorage.getItem("nf_staff")) return;
+    const m = {producto:"ViewContent", carrito:"AddToCart", checkout:"InitiateCheckout", pedido:"Purchase"}[paso];
+    if(!m) return;
+    const d = {currency:"MXN"};
+    if(m==="Purchase" || m==="InitiateCheckout") d.value = totalFinal();
+    else d.value = cartTotal();
+    fbq("track", m, d);
+  }catch{}
+}
 function stat(paso){
+  pxEv(paso);
   try{
     if(mode!=="domicilio" || localStorage.getItem("nf_staff")) return;
     const k = "nf_st_"+HOY_MX; const s = JSON.parse(localStorage.getItem(k)||"{}");
