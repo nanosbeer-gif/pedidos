@@ -774,6 +774,7 @@ function resumenView(){
     ${e.barras>1?`<h2>Por barra</h2><div class="bars">${porB.map((n,k)=>`<div>${bName(e,k+1)}<b>${n}</b></div>`).join("")}</div>`:""}
     <h2>Más pedidas</h2>
     <div class="top">${topList.length?topList.map(([n,c])=>`<div><span>${esc(n)}</span><b>${c}</b></div>`).join(""):`<p class="empty">Aún no hay pedidos_.</p>`}</div>
+    <div class="blk"><button class="sec" data-dash="${e.id}">📋 Copiar para dashboard</button></div>
     <div class="blk">
       ${cerrando===e.id
         ? `<p class="hint">Al cerrar el evento su QR deja de aceptar pedidos. ${pend?`<b>Quedan ${pend} pedidos sin entregar.</b>`:""}</p>
@@ -781,6 +782,37 @@ function resumenView(){
         : e.estado==="cerrado" ? `<p class="hint">Este evento está cerrado: su QR ya no acepta pedidos.</p><button class="sec" data-reabrir="${e.id}">Reabrir evento</button>`
         : `<button class="sec danger" data-precerrar="${e.id}">Cerrar evento</button>`}
     </div>`;
+}
+
+// ===== Copiar resumen para el dashboard =====
+function dashJSON(e){
+  const vivos = pedidos.filter(p=>p.estado!=="cancelado");
+  const ent = vivos.filter(p=>p.estado==="entregado");
+  const tamTxt = t => t==="½ L" ? "Chica" : t==="1 L" ? "Grande" : (t||"");
+  const cuenta = {};
+  ent.forEach(p=>(p.items||[]).forEach(it=>{
+    const sab = ((it.opciones||[]).find(o=>/^Sabor:\s*/.test(o))||"").replace(/^Sabor:\s*/,"").replace(/^—$/,"");
+    const k = [it.nombre, tamTxt(it.tam), sab].join("|");
+    cuenta[k] = (cuenta[k]||0) + (it.cant||1);
+  }));
+  let f; try{ f = e.creado.toDate(); }catch{ f = new Date(); }
+  return JSON.stringify({
+    tipo:"nanos-pedidos", v:1, evento:e.nombre, fecha:ymd(f),
+    pedidos: vivos.length,
+    bebidas: vivos.reduce((a,p)=>a+(p.items||[]).reduce((x,it)=>x+(it.cant||1),0),0),
+    cancelados: pedidos.length - vivos.length,
+    pendientes: vivos.length - ent.length,
+    items: Object.entries(cuenta).sort((a,b)=>b[1]-a[1]).map(([k,c])=>{ const [n,tam,sabor] = k.split("|"); return {n,tam,sabor,c}; })
+  });
+}
+async function copiarDash(id){
+  const e = ev(id); if(!e) return;
+  const txt = dashJSON(e);
+  try{ await navigator.clipboard.writeText(txt); }
+  catch{ const ta = document.createElement("textarea"); ta.value = txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  const m = document.createElement("div"); m.textContent = "Copiado ✓";
+  m.style.cssText = "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#2ecc71;color:#fff;font-weight:800;padding:12px 26px;border-radius:999px;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:18px";
+  document.body.appendChild(m); setTimeout(()=>m.remove(), 1800);
 }
 
 // ===== Tarjeta QR (canvas) =====
@@ -1012,6 +1044,7 @@ document.addEventListener("click", async e=>{
     catch{ t.disabled = false; }
   }
   else if(t.dataset.precerrar){ cerrando = t.dataset.precerrar; render(); }
+  else if(t.dataset.dash){ copiarDash(t.dataset.dash); }
   else if(t.dataset.nocerrar!==undefined){ cerrando = null; render(); }
   else if(t.dataset.cerrar){
     t.disabled = true;
