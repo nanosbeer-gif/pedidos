@@ -14,7 +14,7 @@
 <title>Barra Nano's Fizz</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
-<script src="menu.js?v=29"></script>
+<script src="menu.js?v=30"></script>
 <style>
 [hidden]{display:none!important}
 /* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
@@ -220,7 +220,7 @@ body.tv .top{display:none}
 </div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, getDocs, getDoc, setDoc, writeBatch, Timestamp, serverTimestamp, documentId } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, addDoc, getDocs, getDoc, setDoc, writeBatch, deleteField, Timestamp, serverTimestamp, documentId } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const app = initializeApp({
@@ -324,7 +324,7 @@ function cuponesView(){
     <p class="hint">Los cupones solo aplican a domicilio. El cliente lo escribe al pagar, o se aplica solo si escanea un QR con el código. En cada pedido verás qué cupón usó y si ese teléfono ya lo había usado.</p>
     ${lista.length ? `<div class="mlist">${lista.map(([k,c])=>`<div class="mi${c.activo?"":" off"}">
       <div class="mtog" style="cursor:default"><span><b style="font-size:17px">${esc(k)}</b><small style="display:block;color:var(--muted);font-weight:700">${esc(tipoTxt(c))}${c.desc?" · "+esc(c.desc):""}</small></span><b>${c.activo?"Activo":"Pausado"}</b></div>
-      <div class="evb" style="margin-top:8px"><button class="sec" data-cuptog="${esc(k)}">${c.activo?"Pausar":"Activar"}</button><button class="sec" data-cupusos="${esc(k)}">${k in cupUsos?`Usado ${cupUsos[k]} ${cupUsos[k]===1?"vez":"veces"}`:"Ver cuántos lo usaron"}</button><button class="sec" data-cupqr="${esc(k)}">QR del cupón</button><button class="sec danger" data-cupdel="${esc(k)}">Borrar</button></div>
+      <div class="evb" style="margin-top:8px"><button class="sec" data-cuptog="${esc(k)}">${c.activo?"Pausar":"Activar"}</button><button class="sec" data-cupusos="${esc(k)}">${k in cupUsos?`Usado ${cupUsos[k]} ${cupUsos[k]===1?"vez":"veces"}`:"Ver cuántos lo usaron"}</button><button class="sec" data-cupqr="${esc(k)}">QR del cupón</button><button class="sec danger" data-cupdel="${esc(k)}">${cupBorrar===k?"¿Seguro? Toca otra vez":"Borrar"}</button></div>
       ${cupQR===k?`<figure style="margin:10px 0 0;text-align:center"><canvas id="cupCanvas" width="900" height="900" hidden></canvas><img id="cupImg" alt="QR del cupón" style="width:100%;max-width:320px;border-radius:12px;background:#fff"><figcaption class="hint">Al escanearlo, el cupón se aplica solo. Mantén presionada la imagen para guardarla.</figcaption></figure>`:""}
     </div>`).join("")}</div>` : `<p class="empty">Aún no tienes cupones. Crea el primero abajo.</p>`}
     <h2>Crear cupón</h2>
@@ -348,7 +348,10 @@ function drawCupQR(){
   for(let r=0;r<n;r++) for(let k=0;k<n;k++) if(q.isDark(r,k)) c.fillRect(Math.floor(m+k*cell), Math.floor(m+r*cell), Math.ceil(cell), Math.ceil(cell));
   $("#cupImg").src = cv.toDataURL("image/png");
 }
-async function guardarCupones(n){ cupones = n; render(); await setDoc(doc(db,"config","cupones"), {codigos: n}); }
+// Guarda solo el cupón que cambia (merge), así nunca se borran los demás aunque la lista no haya cargado
+async function guardarCupon(k, val){ cupones = {...cupones}; if(val===null) delete cupones[k]; else cupones[k] = val; render();
+  await setDoc(doc(db,"config","cupones"), {codigos: {[k]: val===null ? deleteField() : val}}, {merge:true}); }
+let cupBorrar = null;
 const MOT_REEMB = ["No le gustó la bebida","Llegó maltratada / derramada","Bebida equivocada","Faltó una bebida","Llegó muy tarde"];
 let accion = null; // {id, tipo:"cancel"|"reemb"}
 
@@ -481,6 +484,7 @@ function homeView(){
       <p class="hint" style="margin:0 0 8px">Imprímelos una sola vez. Cada QR abre el evento al que asignes esa barra.</p>
       <div class="evb" style="margin-bottom:18px"><button class="sec" data-view="fijos">🔳 Ver e imprimir QR fijos</button></div>
       <h2>Menú y horario</h2>
+      <button class="sec" data-alcohol style="width:100%;margin:0 0 10px;padding:14px;font-weight:800;${alcoholDom?"background:#ffd23f;color:#1a0f33;border-color:#ffd23f":""}"><img src="logo-beer.png" alt="" style="height:28px;vertical-align:middle;margin-right:8px">Menú con alcohol a domicilio: ${alcoholDom?"ACTIVADO 🍺":"Apagado"}</button>
       <div class="evb"><button class="sec" data-view="menu">🥤 Bebidas disponibles / agotadas</button><button class="sec" data-view="horario">🕒 Horario de domicilio</button><button class="sec" data-view="historial">📥 Descargar y vaciar pedidos</button><button class="sec" data-view="cupones">🏷️ Cupones de descuento</button><button class="sec" data-view="stats">📊 Visitas y conversión</button></div>
     </section>`;
 }
@@ -606,9 +610,10 @@ async function borrarHist(){
 
 // ===== Menú: disponible / agotado =====
 const NFM = window.NF_MENU;
-let agotados = {}, tienda = null, menuMarca = "fizz", freshForm = false;
+let agotados = {}, tienda = null, menuMarca = "fizz", freshForm = false, alcoholDom = false;
 function listenConfig(){
   onSnapshot(doc(db,"config","menu"), s=>{ agotados = (s.exists() && s.data().agotados) || {}; if(["menu","home"].includes(sel.view)) render(); }, ()=>{});
+  onSnapshot(doc(db,"config","alcohol"), s=>{ alcoholDom = !!(s.exists() && s.data().domicilio); if(sel.view==="home") render(); }, ()=>{});
   onSnapshot(doc(db,"config","cupones"), s=>{ cupones = (s.exists() && s.data().codigos) || {}; if(sel.view==="cupones") render(); }, ()=>{});
   onSnapshot(doc(db,"config","barras"), s=>{ asign = (s.exists() && s.data().asign) || {}; if(["home","fijos"].includes(sel.view)) render(); }, ()=>{});
   onSnapshot(doc(db,"config","tienda"), s=>{ tienda = s.exists() ? s.data() : null; if(["horario","home"].includes(sel.view)){ freshForm = true; render(); } }, ()=>{});
@@ -979,7 +984,7 @@ document.addEventListener("submit", async e=>{
     if(tipo!=="envio" && valor<=0){ $("#cupErr").textContent = "Pon el valor del descuento."; return; }
     if(tipo==="pct" && valor>100){ $("#cupErr").textContent = "El porcentaje no puede ser mayor a 100."; return; }
     if(!desc) desc = tipo==="pct" ? valor+"% de descuento en tu pedido" : tipo==="monto" ? "$"+valor+" de descuento en tu pedido" : "Envío gratis en tu pedido";
-    try{ await guardarCupones({...cupones, [cod]: {tipo, valor, desc, activo:true}}); }catch{ $("#cupErr").textContent = "No se pudo guardar. Revisa el internet."; }
+    try{ await guardarCupon(cod, {tipo, valor, desc, activo:true}); }catch{ $("#cupErr").textContent = "No se pudo guardar. Revisa el internet."; }
     return;
   }
   if(e.target.id==="hsForm"){ e.preventDefault(); const a = $("#hsDe").value, b = $("#hsA").value; if(a && b && a<=b) buscarHist(a,b); return; }
@@ -1037,11 +1042,12 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.qr){ go({view:"qr", evento:t.dataset.qr}); }
   else if(t.dataset.res){ cerrando = null; go({view:"resumen", evento:t.dataset.res}); }
   else if(t.dataset.home!==undefined){ go({view:"home"}); }
-  else if(t.dataset.cuptog){ const k = t.dataset.cuptog; try{ await guardarCupones({...cupones, [k]: {...cupones[k], activo: !cupones[k].activo}}); }catch{} }
-  else if(t.dataset.cupdel){ const k = t.dataset.cupdel, n = {...cupones}; delete n[k]; if(cupQR===k) cupQR = null; try{ await guardarCupones(n); }catch{} }
+  else if(t.dataset.cuptog){ const k = t.dataset.cuptog; try{ await guardarCupon(k, {...cupones[k], activo: !cupones[k].activo}); }catch{} }
+  else if(t.dataset.cupdel){ const k = t.dataset.cupdel; if(cupBorrar!==k){ cupBorrar = k; render(); return; } cupBorrar = null; if(cupQR===k) cupQR = null; try{ await guardarCupon(k, null); }catch{} }
   else if(t.dataset.cupqr){ cupQR = cupQR===t.dataset.cupqr ? null : t.dataset.cupqr; render(); }
   else if(t.dataset.cupusos){ const k = t.dataset.cupusos; t.textContent = "Contando…";
     try{ const sn = await getDocs(query(collection(db,"pedidos"), where("cupon","==",k))); cupUsos[k] = sn.docs.filter(d=>d.data().estado!=="cancelado").length; }catch{ cupUsos[k] = 0; } render(); }
+  else if(t.dataset.alcohol!==undefined){ const v = !alcoholDom; alcoholDom = v; render(); try{ await setDoc(doc(db,"config","alcohol"), {domicilio: v}); }catch{ alcoholDom = !v; render(); } }
   else if(t.dataset.view){ if(t.dataset.view==="historial") hist = null; go({view:t.dataset.view}); if(t.dataset.view==="stats") cargarStats(); }
   else if(t.dataset.sr){ statsR = t.dataset.sr; cargarStats(); }
   else if(t.dataset.rango){ domRango = t.dataset.rango; known = null; listenPedidos(); render(); }
