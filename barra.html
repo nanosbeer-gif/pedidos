@@ -688,6 +688,7 @@ function colaView(){
     <div class="crumb"><button class="sec" data-home>← Eventos</button>
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">${bName(e,sel.barra)}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
     ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
+    ${sel.evento==="domicilio"?`<button class="sec" data-ventas style="width:100%;margin:0 0 10px">📋 Copiar ventas para el HTML de ventas <small style="opacity:.75">(${RANGOS.find(r=>r[0]===domRango)?.[1]||""})</small></button>`:""}
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
 }
@@ -743,7 +744,8 @@ function card(p){
       ${p.estado==="nuevo"&&p.pago==="Transferencia"?`<div class="nocomp">Revisa en tu banco que llegó el pago antes de preparar</div>`:""}
       ${p.pago==="Tarjeta (liga de pago)"?ligaHTML(p):""}
       ${p.pago==="Transferencia"?(p.comprobante?`<button class="compbtn" data-comp="${p.id}"><img src="${p.comprobante}" alt="Comprobante"><span>Ver comprobante</span></button>`:`<div class="nocomp">⚠️ Sin comprobante todavía</div>`):""}</div>`:""}
-    ${p.estado==="cancelado"?`<div class="tagbad">❌ Cancelado · ${esc(p.cancelMotivo||"sin motivo")}</div><div class="acts"><button class="back" data-id="${p.id}" data-to="nuevo">Reactivar pedido</button></div>`:""}
+    ${p.estado==="cancelado"?`<div class="tagbad">❌ Cancelado · ${esc(p.cancelMotivo||"sin motivo")}${p.preparado?" · 🥤 ya se había preparado":""}</div>
+      ${p.modo==="domicilio"?`<button class="lnkbtn" data-prepset="${p.id}">${p.preparado?"Marcar que NO se preparó":"Marcar que la bebida sí se preparó (se registra como merma)"}</button>`:""}<div class="acts"><button class="back" data-id="${p.id}" data-to="nuevo">Reactivar pedido</button></div>`:""}
     ${p.reembolso?`<div class="tagref">💸 Reembolso ${money(p.reembolso.monto)} · ${esc(p.reembolso.motivo)}</div>`:""}
     ${NEXT[p.estado]?`<div class="acts"><button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
       ${p.estado!=="nuevo"?`<button class="back" data-id="${p.id}" data-to="${p.estado==="lista"?"preparando":"nuevo"}">Regresar</button>`:""}</div>`:""}
@@ -759,8 +761,10 @@ function accionForm(p){
     <b>${cancel?"¿Por qué se cancela?":"¿Por qué se reembolsa?"}</b>
     <div class="mots">${[...mots,"Otro"].map(m=>`<button class="mot" data-mot="${esc(m)}" aria-pressed="${sel0===m}">${esc(m)}</button>`).join("")}</div>
     ${sel0==="Otro"?`<input id="motOtro${p.id}" class="tin" maxlength="80" placeholder="Escribe el motivo">`:""}
+    ${cancel?`<b style="display:block;margin-top:10px">¿La bebida ya se había preparado?</b>
+    <div class="mots"><button class="mot" data-prep="1" aria-pressed="${accion.prep===true}">Sí, ya se preparó</button><button class="mot" data-prep="0" aria-pressed="${accion.prep===false}">No se preparó</button></div>`:""}
     ${!cancel?`<label class="lbl2" for="monto${p.id}">Monto a reembolsar<input id="monto${p.id}" class="tin" type="number" min="0" inputmode="numeric" value="${p.reembolso?p.reembolso.monto:(p.total||0)}"></label>`:""}
-    <div class="acts"><button class="go ${cancel?"lista":""}" data-accok="${p.id}" ${sel0?"":"disabled"}>${cancel?"Cancelar pedido":"Guardar reembolso"}</button><button class="back" data-accno>Volver</button></div>
+    <div class="acts"><button class="go ${cancel?"lista":""}" data-accok="${p.id}" ${sel0 && (!cancel || accion.prep!==undefined)?"":"disabled"}>${cancel?"Cancelar pedido":"Guardar reembolso"}</button><button class="back" data-accno>Volver</button></div>
     ${!cancel && p.reembolso?`<button class="lnkbtn" data-reembdel="${p.id}">Quitar reembolso</button>`:""}
   </div>`;
 }
@@ -829,6 +833,35 @@ function resumenView(){
         : e.estado==="cerrado" ? `<p class="hint">Este evento está cerrado: su QR ya no acepta pedidos.</p><button class="sec" data-reabrir="${e.id}">Reabrir evento</button>`
         : `<button class="sec danger" data-precerrar="${e.id}">Cerrar evento</button>`}
     </div>`;
+}
+
+// ===== Copiar ventas de domicilio para el HTML de ventas =====
+// Entra: entregados (venta) y cancelados que sí se prepararon (merma, $0). Fuera: cancelados sin preparar y pendientes.
+function ventasJSON(){
+  const sel_ = pedidos.filter(p=>p.modo==="domicilio" && (p.estado==="entregado" || (p.estado==="cancelado" && p.preparado)));
+  const fechaDe = p => { let f; try{ f = p.creado.toDate(); }catch{ f = new Date(); } return ymd(f); };
+  const lista = sel_.map(p=>{
+    p_modoActual = p.modo;
+    const items = (p.items||[]).map(it=>{
+      const sab = ((it.opciones||[]).find(o=>/^Sabor:\s*/.test(o))||"").replace(/^Sabor:\s*/,"").replace(/^—$/,"");
+      return {n:it.nombre, tam:it.tam||"", sabor:sab, c:it.cant||1, precio:precioIt(it)};
+    });
+    const sub = items.reduce((a,i)=>a+i.precio*i.c,0), desc = p.descuento||0;
+    return {id:p.id, numero:p.numero, fecha:fechaDe(p), nombre:p.nombre||"", pago:p.pago||"", cancelado:p.estado==="cancelado",
+      cupon:p.cupon||"", descuento:desc, envio: Math.max(0,(p.total||0)-sub+desc), total:p.estado==="cancelado"?0:(p.total||0), items};
+  }).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  return {tipo:"nanos-ventas", v:1, pedidos:lista};
+}
+async function copiarVentas(){
+  const o = ventasJSON();
+  if(!o.pedidos.length){ alert("No hay pedidos entregados en este periodo. Cambia a 3 días, Semana o Mes si buscas días anteriores."); return; }
+  const txt = JSON.stringify(o);
+  try{ await navigator.clipboard.writeText(txt); }
+  catch{ const ta = document.createElement("textarea"); ta.value = txt; ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  const e = o.pedidos.filter(x=>!x.cancelado).length, m = o.pedidos.length - e;
+  const t = document.createElement("div"); t.textContent = `Copiado ✓ ${e} venta${e===1?"":"s"}${m?` + ${m} merma${m===1?"":"s"}`:""}`;
+  t.style.cssText = "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#2ecc71;color:#fff;font-weight:800;padding:12px 26px;border-radius:999px;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:18px";
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 2200);
 }
 
 // ===== Copiar resumen para el dashboard =====
@@ -1036,7 +1069,9 @@ document.addEventListener("submit", async e=>{
 });
 document.addEventListener("click", async e=>{
   const t = e.target.closest("button"); if(!t) return;
-  if(t.dataset.acc){ accion = {id:t.dataset.pid, tipo:t.dataset.acc, motivo:""}; render(); return; }
+  if(t.dataset.acc){ const p0 = pedidos.find(x=>x.id===t.dataset.pid); accion = {id:t.dataset.pid, tipo:t.dataset.acc, motivo:"", prep: p0 && (p0.estado==="lista" || p0.rep) ? true : p0 && p0.estado==="nuevo" ? false : undefined}; render(); return; }
+  if(t.dataset.prep!==undefined && accion){ accion.prep = t.dataset.prep==="1"; render(); return; }
+  if(t.dataset.prepset){ t.disabled = true; const p0 = pedidos.find(x=>x.id===t.dataset.prepset); try{ await updateDoc(doc(db,"pedidos",t.dataset.prepset), {preparado: !(p0 && p0.preparado)}); }catch{} render(); return; }
   if(t.dataset.mot){ accion.motivo = t.dataset.mot; render(); return; }
   if(t.dataset.accno!==undefined){ accion = null; render(); return; }
   if(t.dataset.reembdel){ t.disabled = true; try{ await updateDoc(doc(db,"pedidos",t.dataset.reembdel), {reembolso:null}); accion = null; }catch{} render(); return; }
@@ -1045,7 +1080,7 @@ document.addEventListener("click", async e=>{
     const motivo = accion.motivo==="Otro" ? (($("#motOtro"+id)?.value||"").trim() || "Otro") : accion.motivo;
     t.disabled = true;
     try{
-      if(accion.tipo==="cancel") await updateDoc(doc(db,"pedidos",id), {estado:"cancelado", cancelMotivo:motivo, canceladoEn:serverTimestamp()});
+      if(accion.tipo==="cancel") await updateDoc(doc(db,"pedidos",id), {estado:"cancelado", cancelMotivo:motivo, canceladoEn:serverTimestamp(), preparado: !!accion.prep});
       else { const monto = Math.max(0, parseInt($("#monto"+id)?.value||"0",10)||0); await updateDoc(doc(db,"pedidos",id), {reembolso:{monto, motivo, en:Timestamp.now()}}); }
       accion = null;
     }catch{ t.disabled = false; alert("No se pudo guardar. Revisa el internet."); return; }
@@ -1093,6 +1128,7 @@ document.addEventListener("click", async e=>{
   }
   else if(t.dataset.precerrar){ cerrando = t.dataset.precerrar; render(); }
   else if(t.dataset.dash){ copiarDash(t.dataset.dash); }
+  else if(t.dataset.ventas!==undefined){ copiarVentas(); }
   else if(t.dataset.nocerrar!==undefined){ cerrando = null; render(); }
   else if(t.dataset.cerrar){
     t.disabled = true;
