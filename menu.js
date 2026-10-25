@@ -19,7 +19,7 @@ CATS: [
 ITEMS: [
   {marca:"fizz",id:"smoothie",cat:"clasicas",name:"ICE",price:60,color:"#ff3355,#2fae2f",desc:"Granizado refrescante con mucho hielo.",groups:[{name:"Sabor",opts:["Cereza","Mora azul","Limón"]}]},
   {marca:"fizz",id:"mangonada",cat:"clasicas",name:"Mangonada",price:60,color:"#ff9f1c,#c2410c",desc:"Refrescante, con mucho hielo y trozos de mango natural.",groups:[]},
-  {marca:"fizz",id:"soda",cat:"clasicas",name:"Soda italiana",price:60,color:"#ffd23f,#ff4f6a",desc:"Refrescante a base de té con distintos sabores.",groups:[{name:"Sabor",opts:["Mango","Mora azul","Manzana verde","Frutos rojos","Maracuyá","Sandía","Limonada"]},{name:"Toppings",opts:["Perlas explosivas","Jelly"]}]},
+  {marca:"fizz",id:"soda",cat:"clasicas",name:"Soda italiana",price:70,color:"#ffd23f,#ff4f6a",desc:"Refrescante a base de té con distintos sabores.",groups:[{name:"Sabor",opts:["Mango","Mora azul","Manzana verde","Frutos rojos","Maracuyá","Sandía","Limonada"]},{name:"Toppings",opts:["Perlas explosivas","Jelly"]}]},
   {marca:"fizz",id:"frappe",cat:"clasicas",name:"Frappuccino",price:70,color:"#c98b5a,#5a2f1a",desc:"Frío, cremoso, con crema batida.",groups:[{name:"Sabor",opts:["Fresa","Caramelo","Chocolate","Taro","Matcha"]}]},
   {marca:"fizz",id:"tapioca",cat:"clasicas",name:"Bubble Tea",price:85,color:"#9b7bd6,#6fbf6a",desc:"Cremosa, con perlas de tapioca.",groups:[{name:"Sabor",opts:["Taro","Caramelo","Matcha","Fresa","Chocolate"]}]},
   {marca:"fizz",id:"pina",cat:"clasicas",name:"Piña colada",price:70,color:"#fff3c4,#f5c75a",desc:"Jugo de piña, lechera, crema de coco, un toque de canela y hielo.",groups:[]},
@@ -29,7 +29,7 @@ ITEMS: [
   {marca:"fizz",id:"linterna",cat:"nano",name:"Linterna Verde",price:60,color:"#b6ff6a,#2fae2f",desc:"Sirope y pulpa de manzana verde, Sprite y un toque de limón. Incluye banderilla de gomitas.",groups:[]},
   {marca:"fizz",id:"sangria",cat:"nano",name:"Sangría preparada",price:60,color:"#8a1030,#3a0614",desc:"Escarchada, bien fría.",groups:[]},
   {marca:"fizz",id:"mojito",cat:"mojitos",name:"Mojito natural",price:60,color:"#e9ffd6,#7fdc5a",desc:"Sprite, un toque de limón, azúcar, menta y hierbabuena.",groups:[{name:"Escarchado",opts:["Con dulce","Sin escarchar"]}]},
-  {marca:"fizz",id:"mojitofr",cat:"mojitos",name:"Mojito frutos rojos",price:60,color:"#ff6b8a,#7a1036",desc:"Fresa, blueberry y frambuesa trituradas, sirope de frutos rojos, Sprite, limón, azúcar y hierbabuena.",groups:[]},
+  {marca:"fizz",id:"mojitofr",cat:"mojitos",name:"Mojito frutos rojos",price:70,color:"#ff6b8a,#7a1036",desc:"Fresa, blueberry y frambuesa trituradas, sirope de frutos rojos, Sprite, limón, azúcar y hierbabuena.",groups:[]},
   {marca:"fizz",id:"papas",cat:"botanas",name:"Papas locas",price:60,color:"#ff7a1a,#c2410c",desc:"Papas preparadas con chamoy, Jugo Maggi, salsas y limón. ¡Bien locas!",groups:[{name:"¿Qué ingredientes deseas en tus papas?",multi:true,opts:["Salsa botanera","Salsa Valentina","Salsa Maggi","Chamoy","Tajín","Limón","Más sal","Cacahuates japoneses"]}],noSize:true,extraEvento:60},
   {marca:"beer",id:"b_sola",price:100,cat:"cerveza",name:"Nano sola",desc:"Cerveza solo con limón y sal.",groups:[{name:"Escarchado",opts:["Ajonjolí","Miguelito"]}],noSize:true},
   {marca:"beer",id:"b_trad",price:100,cat:"cerveza",name:"Nano Tradicional",desc:"Con salsa Maggi, salsa inglesa, limón, sal y Tajín.",groups:[{name:"Escarchado",opts:["Ajonjolí","Miguelito"]},{name:"Banderilla",opts:["Gomitas","Tamarindo"]}],noSize:true},
