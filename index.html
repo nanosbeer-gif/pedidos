@@ -614,7 +614,6 @@ async function send(){
     tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
     items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note, precio:l.unit||0})),
-    envio: mode==="domicilio" ? envio() : 0,
     total: mode==="domicilio"?totalFinal():cart.reduce((a,l)=>a+(l.unit||0)*l.qty,0),
     cupon: mode==="domicilio" && cuponDe(cuponAplicado) ? cuponAplicado : "",
     descuento: mode==="domicilio" ? descuento() + (cuponDe(cuponAplicado)?.tipo==="envio" ? envioBase() : 0) : 0,
