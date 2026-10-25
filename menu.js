@@ -17,11 +17,11 @@ CATS: [
   {marca:"beer", id:"tequila", name:"Tequila"}
 ],
 ITEMS: [
-  {marca:"fizz",id:"smoothie",cat:"clasicas",name:"Smoothie ICE",price:60,color:"#ff3355,#2fae2f",desc:"Granizado refrescante con mucho hielo.",groups:[{name:"Sabor",opts:["Cereza","Mora azul","Limón"]}]},
+  {marca:"fizz",id:"smoothie",cat:"clasicas",name:"ICE",price:60,color:"#ff3355,#2fae2f",desc:"Granizado refrescante con mucho hielo.",groups:[{name:"Sabor",opts:["Cereza","Mora azul","Limón"]}]},
   {marca:"fizz",id:"mangonada",cat:"clasicas",name:"Mangonada",price:60,color:"#ff9f1c,#c2410c",desc:"Refrescante, con mucho hielo y trozos de mango natural.",groups:[]},
   {marca:"fizz",id:"soda",cat:"clasicas",name:"Soda italiana",price:60,color:"#ffd23f,#ff4f6a",desc:"Refrescante a base de té con distintos sabores.",groups:[{name:"Sabor",opts:["Mango","Mora azul","Manzana verde","Frutos rojos","Maracuyá","Sandía","Limonada"]},{name:"Toppings",opts:["Perlas explosivas","Jelly"]}]},
   {marca:"fizz",id:"frappe",cat:"clasicas",name:"Frappuccino",price:70,color:"#c98b5a,#5a2f1a",desc:"Frío, cremoso, con crema batida.",groups:[{name:"Sabor",opts:["Fresa","Caramelo","Chocolate","Taro","Matcha"]}]},
-  {marca:"fizz",id:"tapioca",cat:"clasicas",name:"Tapioca",price:85,color:"#9b7bd6,#6fbf6a",desc:"Cremosa, con perlas de tapioca.",groups:[{name:"Sabor",opts:["Taro","Caramelo","Matcha","Fresa","Chocolate"]}]},
+  {marca:"fizz",id:"tapioca",cat:"clasicas",name:"Bubble Tea",price:85,color:"#9b7bd6,#6fbf6a",desc:"Cremosa, con perlas de tapioca.",groups:[{name:"Sabor",opts:["Taro","Caramelo","Matcha","Fresa","Chocolate"]}]},
   {marca:"fizz",id:"pina",cat:"clasicas",name:"Piña colada",price:70,color:"#fff3c4,#f5c75a",desc:"Jugo de piña, lechera, crema de coco, un toque de canela y hielo.",groups:[]},
   {marca:"fizz",id:"pitufina",cat:"nano",name:"Nano Pitufina",price:60,color:"#ff3355,#a3002a",desc:"Sirope mora azul, Sprite y un toque de limón. Incluye banderilla de gomitas.",groups:[]},
   {marca:"fizz",id:"pitufo",cat:"nano",name:"Nano Pitufo",price:60,color:"#5fd3ff,#1a5cff",desc:"La azul de la casa. Incluye banderilla de gomitas.",groups:[]},
