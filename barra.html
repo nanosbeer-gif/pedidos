@@ -63,6 +63,7 @@ h2{font-family:var(--display);font-weight:400;font-size:21px;color:var(--gold);m
 .ord li{background:var(--panel2);border-radius:10px;padding:8px 10px}
 .tam{font-size:12px;font-weight:800;background:var(--bg);border-radius:6px;padding:1px 6px;margin-left:4px}
 .op{color:var(--muted);font-size:13px;margin-top:2px}
+.pz{float:right;font-weight:800;text-align:right;margin-left:8px}.pz small{display:block;font-weight:600;font-size:11px;color:var(--muted)}
 .nota{color:var(--gold);font-size:13px;font-weight:700;margin-top:2px;overflow-wrap:anywhere}
 .dom{margin-top:10px;font-size:13.5px;line-height:1.6;overflow-wrap:anywhere}
 .sel{user-select:all;font-weight:800}
@@ -679,18 +680,41 @@ function colaView(){
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
 }
+// ===== Precios por bebida y desglose =====
+const conPrecio = p => p.modo==="domicilio" || (p.total||0)>0;
+function precioIt(it){
+  if(typeof it.precio==="number") return it.precio;            // pedidos nuevos: precio guardado
+  const m = NFM.ITEMS.find(i=>i.name===it.nombre); if(!m) return 0; // pedidos viejos: se calcula del menú
+  if(p_modoActual==="evento") return m.extraEvento||0;
+  const extras = (it.opciones||[]).reduce((a,o)=>{ const x = /\(\+\$([\d,]+)\)/.exec(o); return a+(x?+x[1].replace(/,/g,""):0); },0);
+  return (m.price||0) + (it.tam==="1 L" && !m.noSize ? 30 : 0) + extras;
+}
+let p_modoActual = "";
+function desglose(p){
+  p_modoActual = p.modo;
+  const sub = (p.items||[]).reduce((a,it)=>a+precioIt(it)*(it.cant||1),0);
+  const desc = p.descuento||0;
+  const env = typeof p.envio==="number" ? p.envio : Math.max(0, (p.total||0) - sub + desc); // pedidos viejos: lo que falta para cuadrar
+  const fila = (t,v,b)=>`<div style="display:flex;justify-content:space-between;${b?"font-weight:800;font-size:17px;border-top:1px solid var(--line,#3a2a6a);padding-top:4px;margin-top:2px":""}"><span>${t}</span><span>${v}</span></div>`;
+  return `<div class="desg" style="background:rgba(255,255,255,.05);border-radius:10px;padding:8px 10px;margin:6px 0">
+    ${fila("Subtotal", money(sub))}
+    ${fila("🛵 Envío", env?money(env):"Gratis")}
+    ${desc?fila("🏷️ Descuento", "−"+money(desc)):""}
+    ${fila("Total", money(p.total||0), true)}</div>`;
+}
 function card(p){
+  p_modoActual = p.modo;
   return `<article class="ord ${p.modo}">
     <header><div class="n">${esc(p.numero)}</div>
       <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
-    <ul>${(p.items||[]).map(it=>`<li><b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
+    <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}<b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
       ${(it.opciones||[]).includes("🚫 SIN ALCOHOL")?`<div class="sinalc">🚫 SIN ALCOHOL</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
     ${p.modo==="evento" && p.total>0 ? `<div style="margin-top:10px;background:#ff3b4e;color:#fff;border-radius:10px;padding:8px 10px;font-weight:800">💵 COBRAR ${money(p.total)} · costo extra, no incluido en el evento</div>` : ""}
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
       ${p.ubicacion&&p.ubicacion.lat?`<div><a class="maplnk" href="https://www.google.com/maps/search/?api=1&query=${p.ubicacion.lat},${p.ubicacion.lng}" target="_blank" rel="noopener">🗺️ Abrir ubicación en Maps</a> ${(p.ubicacion.prec||0)>300?`<small style="color:#ffb020">⚠️ imprecisa (±${Math.round(p.ubicacion.prec/1000)} km): guíate por la dirección</small>`:`<small>(±${p.ubicacion.prec||"?"} m)</small>`}</div>`:`<div><small>Sin ubicación GPS, usar dirección escrita</small></div>`}
-      <div>🛵 ${(p.items||[]).reduce((a,it)=>a+(it.cant||1),0)>=2?"Envío <b>gratis</b>":"Envío <b>$20</b> (ya incluido)"}</div>
+      ${desglose(p)}
       ${p.cupon?`<div class="cuptag">🏷️ Cupón <b>${esc(p.cupon)}</b> · −${money(p.descuento||0)}${cupRepetido(p)}</div>`:""}
       <div>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":" · ya pagado"}</div>
       ${p.rep?`<div style="color:var(--neon);font-weight:800">🛵 ${esc(p.rep.por)} · ${({asignado:"va por el pedido",camino:"en camino",llego:"ya llegó con el cliente",entregado:"entregó"})[p.rep.fase]||""}</div>`:""}
