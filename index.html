@@ -408,6 +408,7 @@ function ageSheet(k){
   openSheet(`<h3>Menú con alcohol</h3><p class="desc" style="font-size:15px;margin-top:8px">Las bebidas de ${MARCAS[k].name} contienen alcohol. Solo se sirven a mayores de 18 años y en la barra pueden pedirte identificación.</p>
     <div style="margin-top:16px;display:grid;gap:10px"><button class="primary" data-mayor="${k}">Soy mayor de 18 años</button><button class="ghost" data-close style="margin-top:0">Soy menor, regresar</button></div>`);
 }
+const conAlcohol = () => cart.some(l=>l.marca==="beer");
 function cartTotal(){ return cart.reduce((a,l)=>a+l.qty*l.unit,0); }
 function renderCart(){
   const n = cart.reduce((a,l)=>a+l.qty,0);
@@ -451,7 +452,7 @@ function addItem(id){
   const choices = (sinAlc ? ["🚫 SIN ALCOHOL"] : []).concat(i.groups.map((gr,gi)=>gr.multi ? (gr.name.replace(/^¿Qué ingredientes deseas en tus papas\?$/,"Ingredientes")+": "+([...document.querySelectorAll(`input[name="g${gi}"]:checked`)].map(c=>c.value).join(", ")||"sin ingredientes extra")) : gr.name+": "+(document.querySelector(`input[name="g${gi}"]:checked`)?.value||"—")));
   const ex = mode==="domicilio" ? [...document.querySelectorAll('input[name="ex"]:checked')].map(x=>(EXTRAS[i.id]||[])[+x.value]).filter(Boolean) : [];
   ex.forEach(x=>choices.push(x.n+" (+"+money(x.p)+")"));
-  const line = {name:i.name,size:i.noSize?"":(big?"1 L":"½ L"),unit:mode==="evento"?(i.extraEvento||0):(i.price||0)+(big&&!i.noSize?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};
+  const line = {marca:i.marca,name:i.name,size:i.noSize?"":(big?"1 L":"½ L"),unit:mode==="evento"?(i.extraEvento||0):(i.price||0)+(big&&!i.noSize?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};
   if(mode==="evento"){ cart = [line]; renderCart(); openCart(); return; }
   cart.push(line); renderCart(); upsell(line);
 }
@@ -482,12 +483,13 @@ function openCart(){
     ${mode==="domicilio"?`<div class="row"><div>Envío${envio()?`<small>¡Gratis pidiendo 2 bebidas o más!</small>`:""}</div><div>${envio()?money(envio()):"<b style='color:var(--neon)'>Gratis</b>"}</div></div>${cuponHTML()}<div class="total"><span>Total a pagar</span><span>${money(totalFinal())}</span></div>`:(cart.some(l=>l.unit>0) ? `<div class="xbox" style="margin-top:12px">⚠️ <b>Este producto tiene costo extra de ${money(cart.reduce((a,l)=>a+l.unit*l.qty,0))}</b>: no está incluido en el evento. Págalo en la barra al recibirlo.</div>` : `<p class="note" style="margin-top:12px">Incluido en el evento. Te avisamos en esta pantalla cuando esté lista.</p>`)}
     <div class="grp"><b>Tus datos</b>${datos}</div>
     ${mode==="domicilio"?`<div class="grp"><b>Pago</b><div class="opts">
-      <label class="opt"><input type="radio" name="pago" id="p1" value="Efectivo" checked><span>Efectivo</span></label>
-      <label class="opt"><input type="radio" name="pago" id="p2" value="Transferencia"><span>Transferencia</span></label>
-      <label class="opt"><input type="radio" name="pago" id="p3" value="Tarjeta al recibir"><span>Tarjeta al recibir</span></label>
+      ${conAlcohol()?"":`<label class="opt"><input type="radio" name="pago" id="p1" value="Efectivo" checked><span>Efectivo</span></label>`}
+      <label class="opt"><input type="radio" name="pago" id="p2" value="Transferencia"${conAlcohol()?" checked":""}><span>Transferencia</span></label>
+      <label class="opt"><input type="radio" name="pago" id="p3" value="Tarjeta (liga de pago)"><span>💳 Tarjeta</span></label>
     </div>
-    <p class="note" id="pagoNote" style="margin-top:8px">Pagas en efectivo al recibir tu pedido.</p>
-    <div id="transfBox" hidden>${transferInfo()}
+    ${conAlcohol()?`<p class="note" style="margin-top:8px">🍺 Los pedidos con bebidas de Nano's Beer se pagan con transferencia o con tarjeta.</p>`:""}
+    <p class="note" id="pagoNote" style="margin-top:8px">${conAlcohol()?"Transfiere el total y sube tu comprobante. Preparamos tu pedido en cuanto confirmamos el pago.":"Pagas en efectivo al recibir tu pedido."}</p>
+    <div id="transfBox"${conAlcohol()?"":" hidden"}>${transferInfo()}
       <label class="ghost" for="compFile" style="display:block;margin-top:10px">🧾 ${compData?"Comprobante listo ✓ (toca para cambiar)":"Subir foto del comprobante"}</label>
       <input type="file" id="compFile" accept="image/*" hidden>
       <p class="note" style="margin-top:6px">Necesitamos la foto del comprobante para enviar tu pedido.</p>
@@ -605,6 +607,9 @@ async function send(){
   const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
   if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
     box.innerHTML = `<p class="err">${mode==="evento"?"Escribe tu nombre para enviar.":"Completa tu nombre, teléfono y dirección para enviar."}</p>`; return;
+  }
+  if(mode==="domicilio" && conAlcohol() && document.querySelector('input[name="pago"]:checked')?.value==="Efectivo"){
+    box.innerHTML = `<p class="err">Los pedidos con alcohol se pagan con transferencia o tarjeta.</p>`; return;
   }
   if(mode==="domicilio" && document.querySelector('input[name="pago"]:checked')?.value==="Transferencia" && !compData){
     box.innerHTML = `<p class="err">Sube la foto de tu comprobante de transferencia para enviar el pedido.</p>`; return;
@@ -812,7 +817,7 @@ document.addEventListener("change", async e=>{
   if(t.name==="pago"){
     const box = $("#transfBox"); if(box) box.hidden = t.value!=="Transferencia";
     const n = $("#pagoNote"); if(n) n.textContent = t.value==="Transferencia" ? "Transfiere el total y sube tu comprobante. Preparamos tu pedido en cuanto confirmamos el pago."
-      : t.value==="Tarjeta al recibir" ? "El repartidor lleva terminal para cobrarte con tarjeta al entregar." : "Pagas en efectivo al recibir tu pedido.";
+      : t.value==="Tarjeta (liga de pago)" ? "Te mandamos por WhatsApp una liga segura para pagar con tu tarjeta desde el celular. En cuanto se refleje tu pago, preparamos tu pedido 💜" : "Pagas en efectivo al recibir tu pedido.";
   }
   if(t.id==="compFile" && t.files[0]){
     const lbl = document.querySelector('label[for="compFile"]'); lbl.textContent = "🧾 Procesando foto…";

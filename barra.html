@@ -707,6 +707,17 @@ function desglose(p){
     ${desc?fila("🏷️ Descuento", "−"+money(desc)):""}
     ${fila("Total", money(p.total||0), true)}</div>`;
 }
+// ===== Pago con tarjeta por liga (Clip / Mercado Pago) enviada por WhatsApp =====
+function ligaHTML(p){
+  const tel = String(p.tel||"").replace(/\D/g,"").slice(-10);
+  const nom = String(p.nombre||"").split(" ")[0];
+  const msg = `¡Hola ${nom}! 💜 Muchas gracias por tu pedido #${p.numero} en Nano's. Para pagar con tu tarjeta de forma segura, aquí tienes tu liga de pago por ${money(p.total)}:\n\n(pega aquí la liga)\n\nEn cuanto se refleje tu pago empezamos a preparar tus bebidas 🍹`;
+  return `<div style="margin-top:8px;padding:10px;border-radius:10px;background:rgba(0,158,227,.15);border:1px solid #009ee3">
+    <div style="font-weight:800">💳 Mandar liga de pago por ${money(p.total)}</div>
+    <small style="display:block;margin:4px 0 8px;color:var(--muted)">1) Crea la liga en Clip o Mercado Pago por ${money(p.total)}. 2) Toca el botón, pega la liga en el mensaje y envíalo.${p.estado==="nuevo"?" 3) Prepara hasta que veas el pago en tu app.":""}</small>
+    ${tel.length===10?`<a class="maplnk" href="https://wa.me/52${tel}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">💬 Abrir WhatsApp del cliente</a>`:`<small>Sin teléfono válido</small>`}
+  </div>`;
+}
 function card(p){
   p_modoActual = p.modo;
   return `<article class="ord ${p.modo}">
@@ -724,6 +735,7 @@ function card(p){
       <div>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · llevar cambio":p.pago==="Tarjeta al recibir"?" · llevar terminal":" · ya pagado"}</div>
       ${p.rep?`<div style="color:var(--neon);font-weight:800">🛵 ${esc(p.rep.por)} · ${({asignado:"va por el pedido",camino:"en camino",llego:"ya llegó con el cliente",entregado:"entregó"})[p.rep.fase]||""}</div>`:""}
       ${p.estado==="nuevo"&&p.pago==="Transferencia"?`<div class="nocomp">Revisa en tu banco que llegó el pago antes de preparar</div>`:""}
+      ${p.pago==="Tarjeta (liga de pago)"?ligaHTML(p):""}
       ${p.pago==="Transferencia"?(p.comprobante?`<button class="compbtn" data-comp="${p.id}"><img src="${p.comprobante}" alt="Comprobante"><span>Ver comprobante</span></button>`:`<div class="nocomp">⚠️ Sin comprobante todavía</div>`):""}</div>`:""}
     ${p.estado==="cancelado"?`<div class="tagbad">❌ Cancelado · ${esc(p.cancelMotivo||"sin motivo")}</div><div class="acts"><button class="back" data-id="${p.id}" data-to="nuevo">Reactivar pedido</button></div>`:""}
     ${p.reembolso?`<div class="tagref">💸 Reembolso ${money(p.reembolso.monto)} · ${esc(p.reembolso.motivo)}</div>`:""}
