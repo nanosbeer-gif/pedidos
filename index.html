@@ -238,7 +238,10 @@ function opcionesWA(){
       ...(p ? [
         ["🛵","¿Cuánto falta para mi pedido?", `🛵 [ESTATUS]${ref} ¿Cuánto falta para que llegue?`],
         ["✏️","Cambiar o cancelar mi pedido", `✏️ [CAMBIO]${ref} Quiero hacer un cambio: `],
-        ["💸","Ya hice mi transferencia", `💸 [PAGO]${ref} Ya hice la transferencia, te envío el comprobante.`],
+        ...(p.pago==="Tarjeta (liga de pago)" ? [
+          ["💳","Mándenme mi liga para pagar con tarjeta", `💳 [LIGA DE PAGO]${ref} ¡Hola! Quiero pagar con tarjeta, ¿me envían mi liga de pago por ${money(p.total||0)}? 😊`],
+          ["✅","Ya pagué con la liga", `✅ [PAGO]${ref} ¡Listo! Ya pagué con la liga de pago 💳`],
+        ] : [["💸","Ya hice mi transferencia", `💸 [PAGO]${ref} Ya hice la transferencia, te envío el comprobante.`]]),
       ] : []),
       ["⚠️","Tuve un problema con mi pedido", `⚠️ [PROBLEMA]${ref} Tuve un problema con mi pedido: `],
       ["🥤","Pregunta sobre el menú o precios", "🥤 [MENÚ] Hola, tengo una pregunta sobre el menú: "],
@@ -728,6 +731,10 @@ function renderStatus(p){ setTimeout(renderWA, 0);
     ${p.modo==="evento" && p.total>0 && p.estado!=="entregado" && p.estado!=="cancelado" ? `<div class="xbox">⚠️ <b>Recuerda que este producto tiene costo extra</b> y no está incluido en el evento. Paga <b>${money(p.total)}</b> en la barra al recibirlo.</div>` : ""}
     ${p.estado==="cancelado"?"":`<ol class="steps${pasos.length===5?" s5":""}">`+pasos.map((s,k)=>`<li class="${k<idx?"pas":k===idx?"now":""}">${s[1]}</li>`).join("")+`</ol>`}
     <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)}${it.tam?` (${esc(it.tam)})`:""}</div>`).join("")}${p.modo==="domicilio"?`<div style="margin-top:6px"><b>Total: ${money(p.total||0)}</b> · ${esc(p.pago)}</div>`:""}</div>
+    ${p.modo==="domicilio" && p.pago==="Tarjeta (liga de pago)" && p.estado==="nuevo" ? `<div style="margin-top:12px;padding:14px;border-radius:14px;background:rgba(0,158,227,.15);border:1px solid #009ee3;text-align:left">
+      <b style="font-size:16px">💳 ¡Ya casi! Te enviamos tu liga de pago</b>
+      <p class="note" style="margin-top:6px">En unos minutos te llega por WhatsApp${p.tel?` al <b>${esc(p.tel)}</b>`:""} una liga segura para pagar <b>${money(p.total||0)}</b> con tu tarjeta desde el celular. En cuanto se refleje tu pago, empezamos a preparar tus bebidas 🍹</p>
+      <p class="note" style="margin-top:6px">¿No te ha llegado? Toca el botón de WhatsApp y elige <b>"Mándenme mi liga"</b> 💜</p></div>` : ""}
     ${p.modo==="domicilio" && p.pago==="Transferencia" && p.estado!=="entregado" ? (p.comprobante ? `<p class="note" style="margin-top:12px">🧾 Comprobante recibido ✓</p>` : `<div style="margin-top:14px">${transferInfo()}<label class="primary" for="compLater" style="margin-top:10px">🧾 Subir comprobante</label><input type="file" id="compLater" data-order="${p.id}" accept="image/*" hidden><p class="note" id="compMsg"></p></div>`) : ""}
     ${(p.estado==="entregado"||p.estado==="cancelado")&&p.modo==="evento"?`<button class="primary" id="backBtn">Pedir otra bebida</button>`:`<button class="ghost" id="backBtn">Ver el menú</button>`}
     ${p.modo==="evento" && (p.estado==="lista"||p.estado==="entregado") ? `<button class="wabtn" style="margin-top:14px;width:100%" data-wa>${WA_ICON}<span>¿Te gustó? Contrátanos para tu evento</span></button>` : ""}
