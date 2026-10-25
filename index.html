@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="app-ver" content="43">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -420,6 +421,7 @@ function renderCart(){
   $("#cartTotal").textContent = mode==="evento" ? "Listo" : money(totalFinal());
 }
 function openSheet(html){ $("#sheet").innerHTML = html; $("#sheetBg").hidden = false; }
+window.__ocupado = () => cart.length>0 || !$("#sheetBg").hidden || !!(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
 function closeSheet(){ $("#sheetBg").hidden = true; }
 
 function openItem(id){
@@ -845,6 +847,23 @@ if("serviceWorker" in navigator && !E) navigator.serviceWorker.register("sw.js")
 loadMine(); mine.forEach(m=>track(m.id));
 autoOpen = mine[0]?.id || null;
 
+</script>
+<script>
+/* Auto-actualización: si en GitHub hay una versión nueva, la página se recarga sola (sin interrumpir un pedido en curso) */
+(function(){
+  var V=(document.querySelector('meta[name="app-ver"]')||{}).content||"";
+  function chk(){
+    if(document.visibilityState!=="visible") return;
+    fetch(location.pathname+"?nc="+Date.now(),{cache:"no-store"}).then(function(r){return r.text()}).then(function(t){
+      var m=t.match(/name="app-ver" content="([^"]+)"/); if(!m||m[1]===V) return;
+      try{ if(sessionStorage.getItem("nf_rl_"+m[1])) return; }catch(e){}
+      if(window.__ocupado && window.__ocupado()){ setTimeout(chk,60000); return; }
+      try{ sessionStorage.setItem("nf_rl_"+m[1],"1"); }catch(e){}
+      var u=new URL(location.href); u.searchParams.set("v",m[1]); location.replace(u.toString());
+    }).catch(function(){});
+  }
+  document.addEventListener("visibilitychange",chk); setTimeout(chk,3000); setInterval(chk,300000);
+})();
 </script>
 </body>
 </html>
