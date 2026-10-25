@@ -135,15 +135,32 @@ function makeChime(){
   dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true); w(36,"data"); dv.setUint32(40,n*2,true);
   new Int16Array(buf,44).set(data); return URL.createObjectURL(new Blob([buf],{type:"audio/wav"}));
 }
-const chime = new Audio(makeChime()); chime.preload = "auto"; let soundOn = false;
+const chime = new Audio(makeChime()); chime.preload = "auto"; let soundOn = true;
 function unlockSound(){ try{ chime.muted=true; const p=chime.play(); const d=()=>{chime.pause();chime.currentTime=0;chime.muted=false;}; p&&p.then?p.then(d).catch(()=>{chime.muted=false}):d(); }catch{} }
 function ring(){ if(soundOn){ try{ chime.currentTime=0; chime.play().catch(()=>{}); }catch{} } try{ navigator.vibrate&&navigator.vibrate([400,150,400,150,700]); }catch{}
   document.body.classList.add("flash"); setTimeout(()=>document.body.classList.remove("flash"),8000); }
 let wake = null; async function keepAwake(){ try{ wake = await navigator.wakeLock?.request("screen"); }catch{} }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible"){ if(soundOn||activo) keepAwake(); if(activo) startGPS(); } });
+// Sonido activado por defecto (se recuerda). El navegador exige un primer toque: se desbloquea solo al tocar cualquier parte.
+const sndPref = (()=>{ try{ return localStorage.getItem("nf_snd")!=="0"; }catch{ return true; } })();
+function pintarSnd(){ const b = document.getElementById("soundBtn"); if(b){ b.textContent = soundOn ? "🔔 Sonido activado" : "🔕 Activar sonido"; b.setAttribute("aria-pressed", soundOn); } }
+function guardarSnd(){ try{ localStorage.setItem("nf_snd", soundOn?"1":"0"); }catch{} }
+document.addEventListener("pointerdown", e=>{ if(soundOn && !(e.target.closest && e.target.closest("#soundBtn"))){ unlockSound(); keepAwake(); } }, {once:true, capture:true});
+soundOn = sndPref; setTimeout(pintarSnd, 0);
 
 // ===== Pedidos =====
 const FASE = {asignado:"Va por el pedido", camino:"En camino", llego:"Llegó"};
+// ===== Varios pedidos a la vez (un solo repartidor por ahora) =====
+let verLista = false;
+const misPedidos = () => pedidos.filter(p=>p.rep && p.rep.por===yo && p.estado!=="entregado");
+const normDir = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+function mismaDir(a, b){
+  if(a.id===b.id) return true;
+  if(normDir(a.direccion) && normDir(a.direccion)===normDir(b.direccion)) return true;
+  const ua = a.ubicacion, ub = b.ubicacion;
+  return !!(ua && ub && ua.lat && ub.lat && (ua.prec||0)<=300 && (ub.prec||0)<=300 && dist([ua.lat,ua.lng],[ub.lat,ub.lng]) < 60);
+}
+const grupo = p => misPedidos().filter(x=>mismaDir(p,x));
 function listen(){
   unsub && unsub();
   const q = query(collection(db,"pedidos"), where("creado",">=",Timestamp.fromMillis(Date.now()-14*3600*1000)));
@@ -154,7 +171,7 @@ function listen(){
     if(known && [...libres].some(id=>!known.has(id))) ring();
     known = libres;
     const mio = pedidos.find(p=>p.rep && p.rep.por===yo && p.estado!=="entregado");
-    if(mio && !activo){ activo = mio.id; abrirRuta(); }
+    if(mio && !activo && !verLista){ activo = mio.id; abrirRuta(); }
     if(activo){ const p = pedidos.find(x=>x.id===activo); if(!p || p.estado==="entregado" || p.estado==="cancelado" || (p.rep && p.rep.por!==yo)) cerrarRuta(); else renderDock(p); }
     render();
   }, ()=>{ $("#main").innerHTML = `<p class="empty">Sin conexión. Revisa tu internet.</p>`; });
@@ -167,14 +184,16 @@ function cardHTML(p, libre){
     <div class="h"><div class="n">${esc(p.numero)}</div><div class="w"><b>${esc(p.nombre)}</b><small>${est} ${rep}</small></div></div>
     <div class="info">📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}<br>🥤 ${items}<br>💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · lleva cambio":p.pago==="Tarjeta al recibir"?" · lleva terminal":" · ya pagado"}
     ${p.ubicacion&&p.ubicacion.lat&&(p.ubicacion.prec||0)<=300?"":`<br><small style="color:var(--gold)">⚠️ Sin ubicación GPS del cliente: la ruta se busca por la dirección.</small>`}</div>
-    ${libre?`<button class="go${p.estado==="lista"?" pink":""}" data-acepta="${p.id}">Aceptar este pedido</button>`:""}
+    ${libre?`<button class="go${p.estado==="lista"?" pink":""}" data-acepta="${p.id}">${misPedidos().length?"➕ Tomar también este pedido":"Aceptar este pedido"}</button>`:""}
   </article>`;
 }
 function render(){
   if(activo) return;
   const libres = pedidos.filter(p=>p.estado!=="entregado" && !p.rep);
   const otros = pedidos.filter(p=>p.estado!=="entregado" && p.rep && p.rep.por!==yo);
-  $("#main").innerHTML = `<h2>Pedidos por entregar</h2>
+  const mios = misPedidos();
+  $("#main").innerHTML = `${mios.length?`<h2>Mis pedidos (${mios.length})</h2>${mios.map(p=>cardHTML(p,false).replace("</article>",`<button class="go gold" data-abrir="${p.id}">🧭 Abrir ruta a este pedido</button></article>`)).join("")}`:""}
+    <h2>Pedidos por entregar</h2>
     ${libres.length ? libres.map(p=>cardHTML(p,true)).join("") : `<p class="empty">No hay pedidos por entregar. Te suena cuando llegue uno${soundOn?"":" (activa el sonido arriba)"}.</p>`}
     ${otros.length ? `<h2>Los lleva otro repartidor</h2>${otros.map(p=>cardHTML(p,false)).join("")}` : ""}
     <p class="hint">Deja esta página abierta mientras esperas pedidos. Al aceptar uno se abre el mapa con la ruta.</p>`;
@@ -228,7 +247,7 @@ async function buscarDestino(p){
       const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx${near}&q=${encodeURIComponent(p.direccion)}`).then(r=>r.json());
       if(r && r[0]) dest = [+r[0].lat, +r[0].lon];
     }catch{}
-    if(!dest){ setTurn("📍","No encontré la dirección en el mapa","Usa el botón Waze de abajo"); return; }
+    if(!dest){ setTurn("📍","No encontré la dirección en el mapa","Usa Waze o Google Maps abajo"); return; }
   }
   if(dest && !dstMk) dstMk = L.marker(dest,{icon:L.divIcon({className:"",html:'<div class="pin">🏠</div>',iconSize:[30,30],iconAnchor:[15,28]})}).addTo(map);
 }
@@ -282,46 +301,65 @@ function enviarPos(p, acc){
   if(now-lastSent < 8000 || (moved < 15 && now-lastSent < 30000)) return;
   lastSent = now; lastSentPos = pos;
   const r = restante();
-  setDoc(doc(db,"rastreo",p.id), {lat:+pos[0].toFixed(6), lng:+pos[1].toFixed(6), acc, t:serverTimestamp(), min: etaMin(), m: r===null?null:Math.round(r), dlat: dest?dest[0]:null, dlng: dest?dest[1]:null}).catch(()=>{});
+  const ids = grupo(p).map(x=>x.id); if(!ids.includes(p.id)) ids.push(p.id);
+  for(const id of ids) setDoc(doc(db,"rastreo",id), {lat:+pos[0].toFixed(6), lng:+pos[1].toFixed(6), acc, t:serverTimestamp(), min: etaMin(), m: r===null?null:Math.round(r), dlat: dest?dest[0]:null, dlng: dest?dest[1]:null}).catch(()=>{});
 }
 function renderDock(p){
   const f = p.rep?.fase || "asignado";
   const tel = String(p.tel||"").replace(/\D/g,""), tel52 = tel.length===10 ? "52"+tel : tel;
   const wa = `https://wa.me/${tel52}?text=${encodeURIComponent(`¡Hola ${p.nombre||""}! 🛵 Soy ${yo} de Nano's Fizz, ya llegué con tu pedido. Estoy afuera 🙌`)}`;
   const waze = dest ? `https://waze.com/ul?ll=${dest[0]},${dest[1]}&navigate=yes` : `https://waze.com/ul?q=${encodeURIComponent(p.direccion||"")}&navigate=yes`;
-  const cobro = `💵 ${esc(p.pago)} · Cobrar <b>${money(p.total)}</b>${p.pago==="Efectivo"?" · cambio":p.pago==="Tarjeta al recibir"?" · terminal":" · pagado"}`;
+  const g = grupo(p), otrosG = g.filter(x=>x.id!==p.id);
+  const cobro1 = x => `💵 ${esc(x.pago)} · Cobrar <b>${money(x.total)}</b>${x.pago==="Efectivo"?" · cambio":x.pago==="Tarjeta al recibir"?" · terminal":" · pagado"}`;
+  const cobro = otrosG.length
+    ? `📦 <b>${g.length} pedidos en esta dirección:</b><br>${g.map(x=>`#${esc(x.numero)} ${esc(x.nombre)} · ${cobro1(x)}`).join("<br>")}`
+    : cobro1(p);
+  const gmaps = dest ? `https://www.google.com/maps/dir/?api=1&destination=${dest[0]},${dest[1]}&travelmode=driving` : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(p.direccion||"")}&travelmode=driving`;
+  const nMios = misPedidos().length;
   const btn = f==="asignado" ? `<button class="go gold" data-fase="camino">📦 Ya tengo el pedido · Salir</button>`
     : f==="camino" ? `<button class="go pink" data-fase="llego">🚪 Ya llegué</button>`
     : `<div class="row"><a class="go blue" href="tel:${tel}">📞 Llamar</a><a class="go" href="${wa}" target="_blank" rel="noopener">💬 WhatsApp</a></div><button class="go" data-entregado>✅ Entregado</button>`;
   $("#dock").innerHTML = `<div class="who"><b>#${esc(p.numero)} · ${esc(p.nombre)}</b><br>📍 ${esc(p.direccion)}${p.ref?` (${esc(p.ref)})`:""}<br>${cobro}</div>
     ${btn}
-    <div class="row"><a class="small" href="${waze}" target="_blank" rel="noopener">Abrir en Waze</a>${f!=="llego"?`<a class="small" href="tel:${tel}">📞 Llamar al cliente</a>`:`<button class="small" data-fase="camino">← Regresar a "en camino"</button>`}</div>
-    ${f==="asignado"?`<button class="small" data-soltar>Soltar pedido (que lo lleve otro)</button>`:""}`;
+    <div class="row"><a class="small" href="${waze}" target="_blank" rel="noopener">Abrir en Waze</a><a class="small" href="${gmaps}" target="_blank" rel="noopener">Abrir en Google Maps</a></div>
+    <div class="row"><button class="small" data-lista>📋 ${nMios>1?`Mis pedidos (${nMios}) · tomar otro`:"Tomar otro pedido"}</button>${f!=="llego"?`<a class="small" href="tel:${tel}">📞 Llamar al cliente</a>`:`<button class="small" data-fase="camino">← Regresar a "en camino"</button>`}</div>
+    ${f==="asignado"&&!otrosG.length?`<button class="small" data-soltar>Soltar pedido (que lo lleve otro)</button>`:""}`;
 }
 
 // ===== Acciones =====
 document.addEventListener("click", async e=>{
   const t = e.target.closest("button,[data-acepta]"); if(!t) return;
-  if(t.id==="soundBtn"){ unlockSound(); soundOn = !soundOn; t.textContent = soundOn?"🔔 Sonido activado":"🔕 Activar sonido"; t.setAttribute("aria-pressed",soundOn); if(soundOn){ keepAwake(); ring(); } render(); }
+  if(t.id==="soundBtn"){ unlockSound(); soundOn = !soundOn; pintarSnd(); guardarSnd(); if(soundOn){ keepAwake(); ring(); } render(); }
   else if(t.id==="outBtn"){ stopGPS(); signOut(auth); }
   else if(t.dataset.acepta){
     const p = pedidos.find(x=>x.id===t.dataset.acepta); if(!p || p.rep) return;
     unlockSound(); t.disabled = true;
-    try{ await updateDoc(doc(db,"pedidos",p.id), {rep:{por:yo, fase:"asignado", t:Date.now()}}); activo = p.id; abrirRuta(); }
+    const yaTenia = misPedidos().length > 0;
+    try{ await updateDoc(doc(db,"pedidos",p.id), {rep:{por:yo, fase:"asignado", t:Date.now()}});
+      if(yaTenia){ verLista = true; render(); } else { verLista = false; activo = p.id; abrirRuta(); } }
     catch{ t.disabled = false; alert("No se pudo aceptar. Revisa tu internet."); }
   }
   else if(t.dataset.fase){
     const p = pedidos.find(x=>x.id===activo); if(!p) return; t.disabled = true;
-    const up = {"rep.fase":t.dataset.fase, "rep.t":Date.now()};
-    if(t.dataset.fase==="camino" && p.estado!=="lista") up.estado = "lista";
-    try{ await updateDoc(doc(db,"pedidos",p.id), up); lastSent = 0; if(pos) enviarPos({...p, rep:{...p.rep, fase:t.dataset.fase}}, 0); }
+    try{
+      for(const x of grupo(p)){
+        const up = {"rep.fase":t.dataset.fase, "rep.t":Date.now()};
+        if(t.dataset.fase==="camino" && x.estado!=="lista") up.estado = "lista";
+        await updateDoc(doc(db,"pedidos",x.id), up);
+      }
+      lastSent = 0; if(pos) enviarPos({...p, rep:{...p.rep, fase:t.dataset.fase}}, 0); }
     catch{ t.disabled = false; alert("No se pudo actualizar. Revisa tu internet."); }
   }
   else if(t.dataset.entregado!==undefined){
     t.disabled = true;
-    try{ await updateDoc(doc(db,"pedidos",activo), {estado:"entregado", "rep.fase":"entregado", "rep.t":Date.now()}); cerrarRuta(); }
+    const p = pedidos.find(x=>x.id===activo), g = p ? grupo(p) : [{id:activo}];
+    try{ for(const x of g) await updateDoc(doc(db,"pedidos",x.id), {estado:"entregado", "rep.fase":"entregado", "rep.t":Date.now()});
+      const hechos = new Set(g.map(x=>x.id)); cerrarRuta(); verLista = false;
+      const sig = misPedidos().find(x=>!hechos.has(x.id)); if(sig){ activo = sig.id; abrirRuta(); } }
     catch{ t.disabled = false; alert("No se pudo marcar como entregado. Revisa tu internet."); }
   }
+  else if(t.dataset.abrir){ verLista = false; activo = t.dataset.abrir; abrirRuta(); }
+  else if(t.dataset.lista!==undefined){ verLista = true; cerrarRuta(); }
   else if(t.dataset.soltar!==undefined){
     try{ await updateDoc(doc(db,"pedidos",activo), {rep:deleteField()}); cerrarRuta(); }catch{}
   }

@@ -295,7 +295,7 @@ const store = { get(k){ try{return localStorage.getItem(k)}catch{return null} },
 
 // Vista actual: {view:"home"} | {view:"cola", evento:id|"domicilio", barra:0|n} | {view:"qr", evento} | {view:"resumen", evento}
 let sel = JSON.parse(store.get("nf_sel") || '{"view":"home"}');
-let knownListos = null, eventosLoaded = false, eventos = [], pedidos = [], tab = "nuevo", unsubEv = null, unsubPed = null, known = null, soundOn = false, wake = null, cerrando = null;
+let knownListos = null, eventosLoaded = false, eventos = [], pedidos = [], tab = "nuevo", unsubEv = null, unsubPed = null, known = null, soundOn = true, wake = null, cerrando = null;
 
 const NEXT = {
   nuevo:      {to:"preparando", label:"Preparar"},
@@ -378,6 +378,12 @@ function ago(ts){
 }
 async function keepAwake(){ try{ wake = await navigator.wakeLock?.request("screen"); }catch{} }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && soundOn) keepAwake(); });
+// Sonido activado por defecto (se recuerda). El navegador exige un primer toque: se desbloquea solo al tocar cualquier parte.
+const sndPref = (()=>{ try{ return localStorage.getItem("nf_snd")!=="0"; }catch{ return true; } })();
+function pintarSnd(){ const b = document.getElementById("soundBtn"); if(b){ b.textContent = soundOn ? "🔔 Sonido activado" : "🔕 Activar sonido"; b.setAttribute("aria-pressed", soundOn); } }
+function guardarSnd(){ try{ localStorage.setItem("nf_snd", soundOn?"1":"0"); }catch{} }
+document.addEventListener("pointerdown", e=>{ if(soundOn && !(e.target.closest && e.target.closest("#soundBtn"))){ unlockSound(); keepAwake(); } }, {once:true, capture:true});
+soundOn = sndPref; setTimeout(pintarSnd, 0);
 
 // ===== Datos en vivo =====
 function listenEventos(){
@@ -1100,7 +1106,7 @@ document.addEventListener("click", async e=>{
   }
   else if(t.id==="soundBtn"){
     unlockSound();
-    soundOn = !soundOn; t.textContent = soundOn ? "🔔 Sonido activado" : "🔕 Activar sonido"; t.setAttribute("aria-pressed", soundOn);
+    soundOn = !soundOn; pintarSnd(); guardarSnd();
     if(soundOn){ setTimeout(()=>ring("🔔 Prueba"), 300); keepAwake(); }
   }
   else if(t.id==="outBtn") signOut(auth);
