@@ -442,7 +442,7 @@ function openItem(id){
       <label class="opt"><input type="radio" name="size" id="s2" value="1"><span>1 litro${mode==="domicilio"?" · "+precioHTML(i.price+EXTRA_LITRO):""}</span></label>
     </div></div>`}${g}
     ${mode==="domicilio" && (EXTRAS[i.id]||[]).length ? `<div class="grp"><b>Extras</b><div class="opts">${EXTRAS[i.id].map((x,xi)=>`<label class="opt"><input type="checkbox" name="ex" id="ex${xi}" value="${xi}"><span>${esc(x.n)} · +${money(x.p)}</span></label>`).join("")}</div></div>` : ""}
-    ${i.sinAlcohol?`<label class="sa" for="sinAlc"><input type="checkbox" id="sinAlc"><span><b>Sin alcohol</b><small>Márcala si la quieres sin alcohol</small></span></label>`:""}
+    ${i.sinAlcohol && mode==="evento"?`<label class="sa" for="sinAlc"><input type="checkbox" id="sinAlc"><span><b>Sin alcohol</b><small>Márcala si la quieres sin alcohol</small></span></label>`:""}
     <label class="f" for="itemNote">¿Algo más? (opcional)<textarea class="t" id="itemNote" maxlength="120" placeholder="Ej. poco hielo, sin limón"></textarea></label>
     ${mode==="domicilio"?`<div class="qty"><button data-q="-1" aria-label="Menos">−</button><output id="q">1</output><button data-q="1" aria-label="Más">+</button></div>`:""}
     <div style="margin-top:18px"><button class="primary" data-add="${i.id}">${xtra?`Pedir · pago ${money(xtra)} en barra`:mode==="evento"?"Pedir esta bebida":"Agregar al pedido"}</button></div>`);
@@ -451,7 +451,7 @@ function addItem(id){
   stat("carrito");
   const i = ITEMS.find(x=>x.id===id);
   const big = document.querySelector('input[name="size"]:checked')?.value==="1";
-  const sinAlc = !!(i.sinAlcohol && $("#sinAlc")?.checked);
+  const sinAlc = !!(i.sinAlcohol && mode==="evento" && $("#sinAlc")?.checked);
   const choices = (sinAlc ? ["🚫 SIN ALCOHOL"] : []).concat(i.groups.map((gr,gi)=>gr.multi ? (gr.name.replace(/^¿Qué ingredientes deseas en tus papas\?$/,"Ingredientes")+": "+([...document.querySelectorAll(`input[name="g${gi}"]:checked`)].map(c=>c.value).join(", ")||"sin ingredientes extra")) : gr.name+": "+(document.querySelector(`input[name="g${gi}"]:checked`)?.value||"—")));
   const ex = mode==="domicilio" ? [...document.querySelectorAll('input[name="ex"]:checked')].map(x=>(EXTRAS[i.id]||[])[+x.value]).filter(Boolean) : [];
   ex.forEach(x=>choices.push(x.n+" (+"+money(x.p)+")"));
@@ -623,7 +623,7 @@ async function send(){
     modo: mode, numero, nombre: v("nombre"),
     tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
-    items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note, precio:l.unit||0})),
+    items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note, precio:l.unit||0, marca:l.marca||""})),
     total: mode==="domicilio"?totalFinal():cart.reduce((a,l)=>a+(l.unit||0)*l.qty,0),
     cupon: mode==="domicilio" && cuponDe(cuponAplicado) ? cuponAplicado : "",
     descuento: mode==="domicilio" ? descuento() + (cuponDe(cuponAplicado)?.tipo==="envio" ? envioBase() : 0) : 0,

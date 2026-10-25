@@ -696,7 +696,7 @@ function colaView(){
 const conPrecio = p => p.modo==="domicilio" || (p.total||0)>0;
 function precioIt(it){
   if(typeof it.precio==="number") return it.precio;            // pedidos nuevos: precio guardado
-  const m = NFM.ITEMS.find(i=>i.name===it.nombre); if(!m) return 0; // pedidos viejos: se calcula del menú
+  const ms = NFM.ITEMS.filter(i=>i.name===it.nombre), m = ms.find(i=>it.marca ? i.marca===it.marca : (!it.tam ? i.noSize : !i.noSize)) || ms[0]; if(!m) return 0; // pedidos viejos: se calcula del menú
   if(p_modoActual==="evento") return m.extraEvento||0;
   const extras = (it.opciones||[]).reduce((a,o)=>{ const x = /\(\+\$([\d,]+)\)/.exec(o); return a+(x?+x[1].replace(/,/g,""):0); },0);
   return (m.price||0) + (it.tam==="1 L" && !m.noSize ? 30 : 0) + extras;
@@ -835,6 +835,16 @@ function resumenView(){
     </div>`;
 }
 
+// Nombre para ventas/dashboard: separa las bebidas que existen en Fizz (sin alcohol) y en Beer (con alcohol)
+function nombreVenta(it){
+  const n = it.nombre||"", fz = NFM.ITEMS.find(i=>i.marca==="fizz" && i.name===n), br = NFM.ITEMS.find(i=>i.marca==="beer" && i.name===n);
+  if(!br) return n;
+  const esBeer = it.marca ? it.marca==="beer" : (!fz || (!it.tam && !fz.noSize));
+  if(!esBeer) return n;
+  const sinAlc = (it.opciones||[]).some(o=>/SIN ALCOHOL/i.test(o));
+  if(sinAlc) return fz ? n : n+" sin alcohol";
+  return fz ? n+" con alcohol" : n;
+}
 // ===== Copiar ventas de domicilio para el HTML de ventas =====
 // Entra: entregados (venta) y cancelados que sí se prepararon (merma, $0). Fuera: cancelados sin preparar y pendientes.
 function ventasJSON(){
@@ -844,7 +854,7 @@ function ventasJSON(){
     p_modoActual = p.modo;
     const items = (p.items||[]).map(it=>{
       const sab = ((it.opciones||[]).find(o=>/^Sabor:\s*/.test(o))||"").replace(/^Sabor:\s*/,"").replace(/^—$/,"");
-      return {n:it.nombre, tam:it.tam||"", sabor:sab, c:it.cant||1, precio:precioIt(it)};
+      return {n:nombreVenta(it), tam:it.tam||"", sabor:sab, c:it.cant||1, precio:precioIt(it)};
     });
     const sub = items.reduce((a,i)=>a+i.precio*i.c,0), desc = p.descuento||0;
     return {id:p.id, numero:p.numero, fecha:fechaDe(p), nombre:p.nombre||"", pago:p.pago||"", cancelado:p.estado==="cancelado",
@@ -872,7 +882,7 @@ function dashJSON(e){
   const cuenta = {};
   ent.forEach(p=>(p.items||[]).forEach(it=>{
     const sab = ((it.opciones||[]).find(o=>/^Sabor:\s*/.test(o))||"").replace(/^Sabor:\s*/,"").replace(/^—$/,"");
-    const k = [it.nombre, tamTxt(it.tam), sab].join("|");
+    const k = [nombreVenta(it), tamTxt(it.tam), sab].join("|");
     cuenta[k] = (cuenta[k]||0) + (it.cant||1);
   }));
   let f; try{ f = e.creado.toDate(); }catch{ f = new Date(); }
