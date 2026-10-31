@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="45">
+<meta name="app-ver" content="47">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -141,7 +141,7 @@ body.tv .top{display:none}
 .schip{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line)}
 .schip.off{border-color:var(--pink);color:var(--pink);text-decoration:line-through}
 .mtog:focus-visible,.schip:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
-.sinalc{display:inline-block;margin-top:4px;background:var(--pink);color:#fff;font-weight:800;font-size:13px;border-radius:6px;padding:2px 8px}
+.sinalc{display:inline-block;margin-top:4px;background:#e01b1b;color:#fff;font-weight:900;font-size:14px;border-radius:6px;padding:3px 10px;border:2px solid #fff;letter-spacing:.3px}
 .hr{display:grid;gap:10px}
 .hday{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .evf .hname{display:flex!important;align-items:center;gap:10px;font-size:16px!important;cursor:pointer}
@@ -396,7 +396,7 @@ function listenEventos(){
   }, ()=>setLive(false));
 }
 let domRango = "hoy";
-window.__ocupado = () => !!(typeof accion!=="undefined" && accion) || !!(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+window.__ocupado = () => !!man || !!(typeof accion!=="undefined" && accion) || !!(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
 const RANGOS = [["hoy","Hoy"],["3d","3 días"],["semana","Semana"],["mes","Mes"]];
 function desdeRango(r){
   const d = new Date(); d.setHours(0,0,0,0);
@@ -691,6 +691,7 @@ function colaView(){
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">${bName(e,sel.barra)}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
     ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
     ${sel.evento==="domicilio"?`<button class="sec" data-ventas style="width:100%;margin:0 0 10px">📋 Copiar ventas para el HTML de ventas <small style="opacity:.75">(${RANGOS.find(r=>r[0]===domRango)?.[1]||""})</small></button>`:""}
+    ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<button class="sec" data-manual style="width:100%;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular)</button>`:""}
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
 }
@@ -847,6 +848,60 @@ function nombreVenta(it){
   if(sinAlc) return fz ? n : n+" sin alcohol";
   return fz ? n+" con alcohol" : n;
 }
+// ===== Pedido capturado en la barra (invitado sin celular) =====
+let man = null;
+function manItems(e){ const ms = e.marca==="ambos" ? ["fizz","beer"] : [e.marca||"fizz"]; return NFM.ITEMS.filter(i=>ms.includes(i.marca) || NFM.CATS.find(c=>c.id===i.cat && c.todas && !c.soloDom)); }
+function manOpen(){
+  const e = ev(sel.evento); if(!e) return;
+  man = {e, item: ""};
+  let o = document.getElementById("manOv");
+  if(!o){ o = document.createElement("div"); o.id = "manOv"; o.style.cssText = "position:fixed;inset:0;background:rgba(10,4,25,.82);z-index:9000;overflow:auto;padding:16px"; document.body.appendChild(o); }
+  const its = manItems(e), cats = NFM.CATS;
+  o.innerHTML = `<form id="manF" class="evf" style="max-width:520px;margin:0 auto">
+    <b style="font-size:18px">➕ Pedido en barra</b>
+    <small style="color:var(--muted)">Para el invitado que no trae celular. Entra a la cola como cualquier pedido. Dile su número.</small>
+    <label>Nombre del invitado<input id="manNom" maxlength="40" required placeholder="Para llamarlo cuando esté lista"></label>
+    <label>Bebida<select id="manIt" required><option value="">Elige la bebida…</option>${cats.map(c=>{ const l = its.filter(i=>i.cat===c.id); return l.length?`<optgroup label="${esc((NFM.MARCAS[c.marca]||{}).name||"")} · ${esc(c.name)}">${l.map(i=>`<option value="${i.id}">${esc(i.name)}${i.extraEvento?` (costo extra $${i.extraEvento})`:""}</option>`).join("")}</optgroup>`:""; }).join("")}</select></label>
+    <div id="manOps" style="display:grid;gap:12px"></div>
+    ${e.barras>1 && !sel.barra?`<label>Barra<select id="manBar">${Array.from({length:e.barras},(_,k)=>`<option value="${k+1}">${esc(bName(e,k+1))}</option>`).join("")}</select></label>`:""}
+    <label>Nota (opcional)<input id="manNota" maxlength="120" placeholder="Ej. poco hielo"></label>
+    <p class="err" id="manErr"></p>
+    <div class="evb"><button class="go" type="submit" id="manBtn">Enviar a la cola</button><button class="sec" type="button" data-mancerrar>Cancelar</button></div>
+  </form>`;
+  o.hidden = false; setTimeout(()=>$("#manNom")?.focus(), 50);
+}
+function manOps(){
+  const i = NFM.ITEMS.find(x=>x.id===$("#manIt").value), box = $("#manOps"); if(!box) return;
+  if(!i){ box.innerHTML = ""; return; }
+  box.innerHTML = (i.noSize?"":`<label>Tamaño<select id="manTam"><option value="½ L">½ litro</option><option value="1 L">1 litro</option></select></label>`)
+    + i.groups.map((g,gi)=>g.multi
+      ? `<fieldset style="border:1px solid var(--line);border-radius:10px;padding:8px"><legend style="font-weight:700;font-size:13px">${esc(g.name)}</legend>${g.opts.map((o,oi)=>`<label style="display:flex;gap:8px;font-weight:600"><input type="checkbox" name="mg${gi}" value="${esc(o)}" style="width:auto"> ${esc(o)}</label>`).join("")}</fieldset>`
+      : `<label>${esc(g.name)}<select data-mg="${gi}">${g.opts.map(o=>`<option>${esc(o)}</option>`).join("")}</select></label>`).join("")
+    + (i.sinAlcohol?`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="manSin" style="width:auto"> 🚫 Sin alcohol</label>`:"")
+    + (i.extraEvento?`<div class="nocomp">💵 Tiene costo extra: cobra $${i.extraEvento} al entregar.</div>`:"");
+}
+async function manEnviar(){
+  const e = man && man.e, i = NFM.ITEMS.find(x=>x.id===$("#manIt").value), nom = ($("#manNom").value||"").trim(), err = $("#manErr");
+  if(!nom){ err.textContent = "Escribe el nombre del invitado."; return; }
+  if(!i){ err.textContent = "Elige la bebida."; return; }
+  const ops = (i.sinAlcohol && $("#manSin")?.checked ? ["🚫 SIN ALCOHOL"] : []).concat(i.groups.map((g,gi)=>g.multi
+    ? (g.name.replace(/^¿Qué ingredientes deseas en tus papas\?$/,"Ingredientes")+": "+([...document.querySelectorAll(`input[name="mg${gi}"]:checked`)].map(c=>c.value).join(", ")||"sin ingredientes extra"))
+    : g.name+": "+(document.querySelector(`[data-mg="${gi}"]`)?.value||"—")));
+  const numero = String(Math.floor(100 + Math.random()*900));
+  const btn = $("#manBtn"); btn.disabled = true; btn.textContent = "Enviando…";
+  try{
+    await addDoc(collection(db,"pedidos"), {modo:"evento", numero, nombre:nom, tel:"", direccion:"", ref:"", pago:"",
+      items:[{nombre:i.name, tam:i.noSize?"":($("#manTam")?.value||"½ L"), cant:1, opciones:ops, nota:($("#manNota").value||"").trim(), precio:i.extraEvento||0, marca:i.marca}],
+      total:i.extraEvento||0, cupon:"", descuento:0, evento:sel.evento, barra: sel.barra || +($("#manBar")?.value||1),
+      ubicacion:null, comprobante:"", estado:"nuevo", creado:serverTimestamp()});
+    document.getElementById("manOv").hidden = true; man = null;
+    const t = document.createElement("div"); t.textContent = `✓ Pedido #${numero} de ${nom}. Dile su número.`;
+    t.style.cssText = "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#2ecc71;color:#fff;font-weight:800;padding:14px 24px;border-radius:999px;z-index:9999;font-size:18px;box-shadow:0 6px 20px rgba(0,0,0,.35)";
+    document.body.appendChild(t); setTimeout(()=>t.remove(), 6000);
+  }catch{ btn.disabled = false; btn.textContent = "Enviar a la cola"; err.textContent = "No se pudo enviar. Revisa que el evento siga abierto y el internet."; }
+}
+document.addEventListener("change", e=>{ if(e.target.id==="manIt") manOps(); });
+
 // ===== Copiar ventas de domicilio para el HTML de ventas =====
 // Entra: entregados (venta) y cancelados que sí se prepararon (merma, $0). Fuera: cancelados sin preparar y pendientes.
 function ventasJSON(){
@@ -1039,6 +1094,7 @@ $("#loginForm").addEventListener("submit", async e=>{
   btn.disabled = false;
 });
 document.addEventListener("submit", async e=>{
+  if(e.target.id==="manF"){ e.preventDefault(); await manEnviar(); return; }
   if(e.target.id==="cupForm"){
     e.preventDefault();
     const cod = $("#cupCod").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,""), tipo = $("#cupTipo").value, valor = parseInt($("#cupVal").value||"0",10)||0;
@@ -1141,6 +1197,8 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.precerrar){ cerrando = t.dataset.precerrar; render(); }
   else if(t.dataset.dash){ copiarDash(t.dataset.dash); }
   else if(t.dataset.ventas!==undefined){ copiarVentas(); }
+  else if(t.dataset.manual!==undefined){ manOpen(); }
+  else if(t.dataset.mancerrar!==undefined){ document.getElementById("manOv").hidden = true; man = null; }
   else if(t.dataset.nocerrar!==undefined){ cerrando = null; render(); }
   else if(t.dataset.cerrar){
     t.disabled = true;

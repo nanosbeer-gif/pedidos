@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="45">
+<meta name="app-ver" content="47">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -142,6 +142,12 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 .price.agt{font-family:var(--body);font-size:13px;font-weight:800;color:var(--pink)}
 .opt.off span{opacity:.45;text-decoration:line-through;cursor:not-allowed}
 .closed{color:var(--pink);font-weight:800}
+.vaso{margin-top:14px;padding:14px;border-radius:14px;background:#ffd23f;color:#1a0b3a;border:3px solid #ff7a00;box-shadow:0 0 0 4px rgba(255,122,0,.25)}
+.vaso b{display:block;font-size:17px;line-height:1.25}.vaso small{display:block;margin-top:4px;font-size:13.5px;font-weight:600}
+.vaso.big{animation:vpulse 1.4s ease-in-out infinite}.vaso.big b{font-size:20px}
+@keyframes vpulse{0%,100%{box-shadow:0 0 0 4px rgba(255,122,0,.25)}50%{box-shadow:0 0 0 10px rgba(255,122,0,.45)}}
+.vaso label{display:flex;gap:10px;align-items:center;margin-top:10px;font-weight:800;font-size:15px;cursor:pointer}.vaso input{width:24px;height:24px;flex:none;accent-color:#1a0b3a}
+@media (prefers-reduced-motion:reduce){.vaso.big{animation:none}}
 .sa{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid var(--line);cursor:pointer}
 .sa input{width:24px;height:24px;accent-color:var(--neon);flex:none}
 .sa b{display:block;font-size:15px}.sa small{color:var(--muted);font-size:12.5px}
@@ -469,6 +475,17 @@ function upsell(line){
     <div style="margin-top:16px;display:grid;gap:10px"><button class="primary" data-close>Sí, agregar otra bebida</button><button class="ghost" id="openCart2" style="margin-top:0">No, ver mi pedido</button></div>`);
 }
 let ubic = null, compData = "";
+// ===== Control de vasos en eventos: para la 2a bebida hay que entregar el vaso de la anterior =====
+const vasosKey = () => "nf_vasos_"+E;
+const vasosPedidos = () => +(store.get(vasosKey())||0);
+const pideBebida = () => mode==="evento" && cart.some(l=>!(l.unit>0));
+function vasoHTML(){
+  if(!pideBebida()) return "";
+  const n = vasosPedidos();
+  return n===0
+    ? `<div class="vaso"><b>🥤 Importante: cuida tu vaso</b><small>Para darte tu segunda bebida, primero debes entregar en la barra el vaso de esta primera bebida.</small><label for="vasoOk"><input type="checkbox" id="vasoOk"> Entendido</label></div>`
+    : `<div class="vaso big"><b>♻️ ENTREGA TU VASO EN LA BARRA</b><small>Para recibir esta bebida, lleva a la barra el vaso de tu bebida anterior.</small><label for="vasoOk"><input type="checkbox" id="vasoOk"> Sí, entregaré mi vaso</label></div>`;
+}
 function openCart(){
   if(cart.length) stat("checkout");
   const rows = cart.map((l,k)=>`<div class="row"><div><b>${l.qty}× ${l.name}${l.size?` (${l.size})`:""}</b>
@@ -499,6 +516,7 @@ function openCart(){
       <input type="file" id="compFile" accept="image/*" hidden>
       <p class="note" style="margin-top:6px">Necesitamos la foto del comprobante para enviar tu pedido.</p>
     </div></div>`:""}
+    ${vasoHTML()}
     <div id="msg"></div>
     <div style="margin-top:16px"><button class="primary" id="sendBtn">Enviar pedido</button></div>`);
 }
@@ -607,9 +625,17 @@ function askLocation(btn){
 async function send(){
   unlockSound();
   if(mode==="evento" && !eventoOk) return closedSheet();
-  if(mode==="evento" && !cart.some(l=>l.unit>0)){ const a = activeEvento(); if(a) return lockSheet(a); }
+  if(mode==="evento" && !cart.some(l=>l.unit>0)){
+    // Una bebida a la vez por celular: revisa en la base los pedidos guardados que aún no se cargan
+    for(const m of mine){ if(!data[m.id]){ try{ const s = await getDoc(doc(db,"pedidos",m.id)); if(s.exists()) data[m.id] = {id:m.id, ...s.data()}; }catch{} } }
+    const a = activeEvento(); if(a) return lockSheet(a);
+  }
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
   const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
+  if(pideBebida() && $("#vasoOk") && !$("#vasoOk").checked){
+    box.innerHTML = `<p class="err">Marca la casilla del vaso para enviar tu pedido 🥤</p>`; $("#vasoOk").closest(".vaso").scrollIntoView({block:"center"}); return;
+  }
+  const bebidaEvento = pideBebida();
   if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
     box.innerHTML = `<p class="err">${mode==="evento"?"Escribe tu nombre para enviar.":"Completa tu nombre, teléfono y dirección para enviar."}</p>`; return;
   }
@@ -639,6 +665,7 @@ async function send(){
     store.set("nf_nombre", orden.nombre);
     if(mode==="domicilio"){ store.set("nf_tel", orden.tel); store.set("nf_dir", orden.direccion); store.set("nf_ref", orden.ref); }
     mine.unshift({id:ref.id, t:Date.now()}); mine = mine.slice(0,10); saveMine();
+    if(bebidaEvento){ const n = vasosPedidos()+1; store.set(vasosKey(), String(n)); try{ const m = JSON.parse(store.get("nf_vez")||"{}"); m[ref.id] = n; store.set("nf_vez", JSON.stringify(m)); }catch{} }
     data[ref.id] = {id:ref.id, ...orden, creado:null};
     if(orden.cupon){ store.del("nf_cupon"); cuponAplicado = ""; setModeUI(); renderMenu(); }
     stat("pedido");
@@ -730,6 +757,7 @@ function renderStatus(p){ setTimeout(renderWA, 0);
   $("#status").innerHTML = `<div class="st">
     <p class="lbl">Tu número</p><div class="num">${esc(p.numero)}</div><p class="who">${esc(p.nombre)}</p>
     ${big}
+    ${p.modo==="evento" && p.estado!=="entregado" && p.estado!=="cancelado" && (()=>{ try{ return (JSON.parse(store.get("nf_vez")||"{}")[p.id]||0)>=2; }catch{ return false; } })() ? `<div class="vaso big" style="text-align:left"><b>♻️ LLEVA TU VASO A LA BARRA</b><small>Para recibir esta bebida, entrega el vaso de tu bebida anterior.</small></div>` : ""}
     ${p.modo==="evento" && p.total>0 && p.estado!=="entregado" && p.estado!=="cancelado" ? `<div class="xbox">⚠️ <b>Recuerda que este producto tiene costo extra</b> y no está incluido en el evento. Paga <b>${money(p.total)}</b> en la barra al recibirlo.</div>` : ""}
     ${p.estado==="cancelado"?"":`<ol class="steps${pasos.length===5?" s5":""}">`+pasos.map((s,k)=>`<li class="${k<idx?"pas":k===idx?"now":""}">${s[1]}</li>`).join("")+`</ol>`}
     <div class="mini">${(p.items||[]).map(it=>`<div>${it.cant}× ${esc(it.nombre)}${it.tam?` (${esc(it.tam)})`:""}</div>`).join("")}${p.modo==="domicilio"?`<div style="margin-top:6px"><b>Total: ${money(p.total||0)}</b> · ${esc(p.pago)}</div>`:""}</div>
@@ -790,7 +818,7 @@ function closedSheet(){
 }
 function lockSheet(p){
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Ya tienes una bebida pedida</h3>
-    <p class="desc" style="font-size:14.5px;margin-top:8px">En el evento es una bebida a la vez. Tu pedido <b>número ${esc(p.numero)}</b> está <b>${ESTADO_TXT[p.estado]}</b>. Cuando termines tu primera bebida podrás pedir otra.</p>
+    <p class="desc" style="font-size:14.5px;margin-top:8px">En el evento es <b>una bebida a la vez por celular</b>. Si alguien de tu mesa no trae celular, puede pedir directo en la barra. Tu pedido <b>número ${esc(p.numero)}</b> está <b>${ESTADO_TXT[p.estado]}</b>. Cuando termines tu primera bebida podrás pedir otra.</p>
     <div style="margin-top:18px"><button class="primary" data-mine="${p.id}">Ver mi pedido</button></div>`);
 }
 
