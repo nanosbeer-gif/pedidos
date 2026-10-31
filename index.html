@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="47">
+<meta name="app-ver" content="51">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -289,6 +289,9 @@ const TRANSFER = { banco:"Plata", titular:"Adrián Sánchez González", clabe:"6
 
 let cat = "todas", cart = [], pendingBeep = false;
 const QS = new URLSearchParams(location.search);
+// Modo barra (?staff=1): el ayudante captura pedidos de invitados sin celular con el mismo menú
+const STAFF = QS.get("staff")==="1";
+if(STAFF){ try{ localStorage.setItem("nf_18","1"); localStorage.setItem("nf_staff","1"); }catch{} }
 let E = QS.get("e") || "", BARRA = Math.max(1, Math.min(9, parseInt(QS.get("b")||"1",10)||1));
 const F = QS.get("f"); let sinEvento = false;
 if(QS.get("c")) try{ localStorage.setItem("nf_cupon", QS.get("c").toUpperCase().slice(0,20)); }catch{}
@@ -366,6 +369,7 @@ setInterval(()=>{ if(!E) setModeUI(); }, 60000);
 function setModeUI(){ setTimeout(renderWA, 0);
   if(mode==="evento"){
     $("#evName").textContent = sinEvento ? "Sin evento activo" : evento ? evento.nombre : evento===false ? "Evento terminado" : "Cargando evento…";
+    if(STAFF) $("#evName").textContent = "🧑‍🍳 MODO BARRA · " + $("#evName").textContent;
     $("#modeNote").textContent = sinEvento ? "Esta barra todavía no tiene un evento activo. Pregunta en la barra o intenta en unos minutos."
       : !E ? "" : (evento && evento.estado!=="activo") || (evento===false)
       ? "Este evento ya terminó y no recibe pedidos. ¡Gracias por venir!"
@@ -480,7 +484,7 @@ const vasosKey = () => "nf_vasos_"+E;
 const vasosPedidos = () => +(store.get(vasosKey())||0);
 const pideBebida = () => mode==="evento" && cart.some(l=>!(l.unit>0));
 function vasoHTML(){
-  if(!pideBebida()) return "";
+  if(!pideBebida() || STAFF) return "";
   const n = vasosPedidos();
   return n===0
     ? `<div class="vaso"><b>🥤 Importante: cuida tu vaso</b><small>Para darte tu segunda bebida, primero debes entregar en la barra el vaso de esta primera bebida.</small><label for="vasoOk"><input type="checkbox" id="vasoOk"> Entendido</label></div>`
@@ -492,7 +496,7 @@ function openCart(){
      <small>${[...l.choices, l.note && ("Nota: "+esc(l.note))].filter(Boolean).join(" · ")}</small>
      <button class="rm" data-rm="${k}">Quitar</button></div><div>${mode==="domicilio"?money(l.qty*l.unit):""}</div></div>`).join("");
   const datos = mode==="evento"
-    ? `<label class="f" for="nombre">Tu nombre<input class="t" id="nombre" maxlength="40" autocomplete="given-name" placeholder="Para llamarte cuando esté lista" value="${esc(store.get("nf_nombre")||"")}"></label>`
+    ? `<label class="f" for="nombre">Tu nombre<input class="t" id="nombre" maxlength="40" autocomplete="given-name" placeholder="${STAFF?"Nombre del invitado":"Para llamarte cuando esté lista"}" value="${STAFF?"":esc(store.get("nf_nombre")||"")}"></label>`
     : `<label class="f" for="nombre">Tu nombre<input class="t" id="nombre" maxlength="40" autocomplete="name" value="${esc(store.get("nf_nombre")||"")}"></label>
        <label class="f" for="tel">Teléfono<input class="t" id="tel" type="tel" maxlength="15" autocomplete="tel" value="${esc(store.get("nf_tel")||"")}"></label>
        <label class="f" for="lugar">Dirección<input class="t" id="lugar" maxlength="120" autocomplete="street-address" placeholder="Calle, número, colonia" value="${esc(store.get("nf_dir")||"")}"></label>
@@ -662,6 +666,9 @@ async function send(){
   };
   try{
     const ref = await addDoc(collection(db,"pedidos"), orden);
+    if(STAFF){ cart = []; renderCart(); btn.disabled = false; btn.textContent = "Enviar pedido";
+      openSheet(`<h3>✅ Pedido enviado</h3><div style="text-align:center;margin:14px 0"><div style="font-size:15px;color:var(--muted)">Dile a <b>${esc(orden.nombre)}</b> su número</div><div style="font-size:72px;font-weight:900;color:var(--neon);line-height:1.1">${esc(orden.numero)}</div><div style="font-size:14px;color:var(--muted)">Lo verá en la pantalla de la barra cuando esté lista</div></div><button class="primary" data-close>Siguiente invitado</button>`);
+      return; }
     store.set("nf_nombre", orden.nombre);
     if(mode==="domicilio"){ store.set("nf_tel", orden.tel); store.set("nf_dir", orden.direccion); store.set("nf_ref", orden.ref); }
     mine.unshift({id:ref.id, t:Date.now()}); mine = mine.slice(0,10); saveMine();
@@ -694,7 +701,7 @@ function loadMine(){
   saveMine();
 }
 function saveMine(){ store.set("nf_mis", JSON.stringify(mine.map(m=>({id:m.id,t:m.t})))); }
-function activeEvento(){ return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.evento===E && !(p.total>0) && p.estado!=="entregado" && p.estado!=="cancelado"); }
+function activeEvento(){ if(STAFF) return null; return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.evento===E && !(p.total>0) && p.estado!=="entregado" && p.estado!=="cancelado"); }
 
 function track(id){
   if(watchers[id]) return;
@@ -818,7 +825,7 @@ function closedSheet(){
 }
 function lockSheet(p){
   openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>Ya tienes una bebida pedida</h3>
-    <p class="desc" style="font-size:14.5px;margin-top:8px">En el evento es <b>una bebida a la vez por celular</b>. Si alguien de tu mesa no trae celular, puede pedir directo en la barra. Tu pedido <b>número ${esc(p.numero)}</b> está <b>${ESTADO_TXT[p.estado]}</b>. Cuando termines tu primera bebida podrás pedir otra.</p>
+    <p class="desc" style="font-size:14.5px;margin-top:8px">En el evento es una bebida a la vez. Tu pedido <b>número ${esc(p.numero)}</b> está <b>${ESTADO_TXT[p.estado]}</b>. Cuando termines tu primera bebida podrás pedir otra.<br><br>🙋 <b>¿Alguien de tu mesa quiere una bebida y no trae celular?</b> Puede pasar directo a la barra a pedirla.</p>
     <div style="margin-top:18px"><button class="primary" data-mine="${p.id}">Ver mi pedido</button></div>`);
 }
 

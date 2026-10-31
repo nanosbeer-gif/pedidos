@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="47">
+<meta name="app-ver" content="48">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -691,7 +691,7 @@ function colaView(){
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">${bName(e,sel.barra)}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
     ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
     ${sel.evento==="domicilio"?`<button class="sec" data-ventas style="width:100%;margin:0 0 10px">📋 Copiar ventas para el HTML de ventas <small style="opacity:.75">(${RANGOS.find(r=>r[0]===domRango)?.[1]||""})</small></button>`:""}
-    ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<button class="sec" data-manual style="width:100%;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular)</button>`:""}
+    ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<a class="sec" href="index.html?e=${encodeURIComponent(sel.evento)}&b=${sel.barra||1}&staff=1" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;box-sizing:border-box;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular) · abre el menú</a>`:""}
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
 }
