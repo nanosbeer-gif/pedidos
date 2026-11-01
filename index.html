@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="51">
+<meta name="app-ver" content="52">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -291,6 +291,9 @@ let cat = "todas", cart = [], pendingBeep = false;
 const QS = new URLSearchParams(location.search);
 // Modo barra (?staff=1): el ayudante captura pedidos de invitados sin celular con el mismo menú
 const STAFF = QS.get("staff")==="1";
+// Identificador del celular (para contar invitados y bebidas por invitado en eventos)
+const DEV = (()=>{ try{ let d = localStorage.getItem("nf_dev"); if(!d){ d = Math.random().toString(36).slice(2,10); localStorage.setItem("nf_dev", d); } return d; }catch{ return "x"+Math.random().toString(36).slice(2,8); } })();
+const normNom = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
 if(STAFF){ try{ localStorage.setItem("nf_18","1"); localStorage.setItem("nf_staff","1"); }catch{} }
 let E = QS.get("e") || "", BARRA = Math.max(1, Math.min(9, parseInt(QS.get("b")||"1",10)||1));
 const F = QS.get("f"); let sinEvento = false;
@@ -653,7 +656,7 @@ async function send(){
   const numero = String(Math.floor(100 + Math.random()*900));
   const orden = {
     modo: mode, numero, nombre: v("nombre"),
-    tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):"",
+    tel: mode==="domicilio"?v("tel"):"", direccion: mode==="domicilio"?v("lugar"):"", ref: mode==="domicilio"?v("ref"):(STAFF ? "barra:"+normNom(v("nombre")) : "dev:"+DEV),
     pago: mode==="domicilio"?document.querySelector('input[name="pago"]:checked').value:"",
     items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note, precio:l.unit||0, marca:l.marca||""})),
     total: mode==="domicilio"?totalFinal():cart.reduce((a,l)=>a+(l.unit||0)*l.qty,0),

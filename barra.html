@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="48">
+<meta name="app-ver" content="50">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -141,6 +141,7 @@ body.tv .top{display:none}
 .schip{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line)}
 .schip.off{border-color:var(--pink);color:var(--pink);text-decoration:line-through}
 .mtog:focus-visible,.schip:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+@keyframes invp{0%,100%{box-shadow:0 0 0 0 rgba(224,27,27,.6)}50%{box-shadow:0 0 0 8px rgba(224,27,27,0)}}
 .sinalc{display:inline-block;margin-top:4px;background:#e01b1b;color:#fff;font-weight:900;font-size:14px;border-radius:6px;padding:3px 10px;border:2px solid #fff;letter-spacing:.3px}
 .hr{display:grid;gap:10px}
 .hday{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
@@ -691,6 +692,7 @@ function colaView(){
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">${bName(e,sel.barra)}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
     ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
     ${sel.evento==="domicilio"?`<button class="sec" data-ventas style="width:100%;margin:0 0 10px">📋 Copiar ventas para el HTML de ventas <small style="opacity:.75">(${RANGOS.find(r=>r[0]===domRango)?.[1]||""})</small></button>`:""}
+    ${sel.evento!=="domicilio" ? invBanner(e) : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<a class="sec" href="index.html?e=${encodeURIComponent(sel.evento)}&b=${sel.barra||1}&staff=1" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;box-sizing:border-box;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular) · abre el menú</a>`:""}
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
@@ -732,7 +734,7 @@ function card(p){
   p_modoActual = p.modo;
   return `<article class="ord ${p.modo}">
     <header><div class="n">${esc(p.numero)}</div>
-      <div class="who"><b>${esc(p.nombre)}</b><small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
+      <div class="who"><b>${esc(p.nombre)}</b>${vezBadge(p)}<small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
     <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}<b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
       ${(it.opciones||[]).includes("🚫 SIN ALCOHOL")?`<div class="sinalc">🚫 SIN ALCOHOL</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
@@ -753,6 +755,7 @@ function card(p){
     ${NEXT[p.estado]?`<div class="acts"><button class="go ${p.estado}" data-id="${p.id}" data-to="${NEXT[p.estado].to}">${NEXT[p.estado].label}</button>
       ${p.estado!=="nuevo"?`<button class="back" data-id="${p.id}" data-to="${p.estado==="lista"?"preparando":"nuevo"}">Regresar</button>`:""}</div>`:""}
     ${NEXT[p.estado] && !(accion&&accion.id===p.id)?`<button class="lnkbtn" data-acc="cancel" data-pid="${p.id}">Cancelar pedido</button>`:""}
+    ${p.estado==="entregado" && !(accion&&accion.id===p.id)?`<div class="acts"><button class="back" data-id="${p.id}" data-to="lista">↩️ Regresar a ¡Lista! (no se ha entregado)</button></div>`:""}
     ${p.estado==="entregado" && !(accion&&accion.id===p.id)?`<button class="lnkbtn" data-acc="reemb" data-pid="${p.id}">${p.reembolso?"Cambiar reembolso":"Registrar reembolso"}</button>`:""}
     ${accion&&accion.id===p.id?accionForm(p):""}
   </article>`;
@@ -848,6 +851,40 @@ function nombreVenta(it){
   if(sinAlc) return fz ? n : n+" sin alcohol";
   return fz ? n+" con alcohol" : n;
 }
+// ===== Conteo de invitados y bebidas por invitado (eventos) =====
+// Cada pedido de evento trae en "ref" el celular ("dev:...") o, si lo capturó la barra, el nombre ("barra:...").
+const invKey = p => p.ref && /^(dev|barra):/.test(p.ref) ? p.ref : "id:"+p.id;
+function invStats(){
+  const vivos = pedidos.filter(p=>p.modo==="evento" && p.estado!=="cancelado").slice().sort((a,b)=>(a.creado?.toMillis?.()||Date.now())-(b.creado?.toMillis?.()||Date.now()));
+  const vez = {}, cuenta = {};
+  vivos.forEach(p=>{ const k = invKey(p); cuenta[k] = (cuenta[k]||0)+1; vez[p.id] = cuenta[k]; });
+  return {vez, cuenta, invitados: Object.keys(cuenta).length};
+}
+let invAviso = {};
+function invBanner(e){
+  if(!e || !e.personas) return "";
+  const {invitados} = invStats(), lim = +e.personas, extra = invitados - lim, pct = Math.min(100, invitados/lim*100);
+  const prev = invAviso[e.id];
+  if(prev!==undefined && invitados>prev && invitados>=lim && soundOn) ring(invitados===lim ? "✅ Invitados completos" : "⚠️ Invitado extra");
+  invAviso[e.id] = invitados;
+  const color = extra>0 ? "#e01b1b" : extra===0 ? "#ffb020" : "var(--neon)";
+  return `<div style="margin:0 0 10px;padding:12px 14px;border-radius:14px;border:2px solid ${color};background:${extra>0?"rgba(224,27,27,.18)":"rgba(255,255,255,.04)"}${extra>0?";animation:invp 1.2s ease-in-out infinite":""}">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:15px">👥 Invitados atendidos</b><b style="font-size:24px;color:${color}">${invitados} / ${lim}</b></div>
+    <div style="height:8px;border-radius:99px;background:rgba(255,255,255,.1);margin-top:8px;overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:${color}"></i></div>
+    ${extra>0?`<div style="margin-top:8px;font-weight:900;font-size:17px;color:#fff">⚠️ ${extra} INVITADO${extra===1?"":"S"} DE MÁS. Se contrataron ${lim} y ya se atendieron ${invitados}.</div>`
+      : extra===0?`<div style="margin-top:8px;font-weight:800;color:#ffb020">✅ Ya se cumplieron los ${lim} invitados contratados. Los que lleguen después son de más.</div>`
+      : `<small style="display:block;margin-top:6px;color:var(--muted)">Faltan ${-extra} para completar los contratados. Cuenta a cada celular (o nombre, si se pidió en barra) en su primera bebida.</small>`}
+  </div>`;
+}
+function vezBadge(p){
+  if(p.modo!=="evento" || p.estado==="cancelado") return "";
+  const n = invStats().vez[p.id]; if(!n) return "";
+  const sinDato = !(p.ref && /^(dev|barra):/.test(p.ref)), barra = p.ref && p.ref.startsWith("barra:");
+  return n===1
+    ? `<span style="display:table;margin:4px 0 2px;background:#2ecc71;color:#08210f;font-weight:900;font-size:12px;border-radius:6px;padding:2px 8px">🆕 1ª bebida · invitado nuevo${barra?" (barra)":""}${sinDato?" ?":""}</span>`
+    : `<span style="display:table;margin:4px 0 2px;background:#ffd23f;color:#1a0b3a;font-weight:900;font-size:12px;border-radius:6px;padding:2px 8px">♻️ ${n}ª bebida · pide su vaso</span>`;
+}
+
 // ===== Pedido capturado en la barra (invitado sin celular) =====
 let man = null;
 function manItems(e){ const ms = e.marca==="ambos" ? ["fizz","beer"] : [e.marca||"fizz"]; return NFM.ITEMS.filter(i=>ms.includes(i.marca) || NFM.CATS.find(c=>c.id===i.cat && c.todas && !c.soloDom)); }
