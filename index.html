@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="52">
+<meta name="app-ver" content="53">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -197,7 +197,7 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 <script src="menu.js?v=34"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, setDoc, increment, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, doc, getDoc, getDocFromServer, updateDoc, setDoc, increment, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDP3ZypMhSahfx-e1KEsSh6rsy4IIJakiU",
@@ -440,7 +440,7 @@ function closeSheet(){ $("#sheetBg").hidden = true; }
 function openItem(id){
   if(mode==="evento" && !eventoOk) return closedSheet();
   const xtra = mode==="evento" && ITEMS.find(x=>x.id===id)?.extraEvento;
-  if(mode==="evento" && !xtra){ const a = activeEvento(); if(a) return lockSheet(a); }
+  if(mode==="evento" && !xtra && activeEvento()){ activeEventoFresco().then(a=>{ if(a) lockSheet(a); else openItem(id); }); return; }
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
   const i = ITEMS.find(x=>x.id===id);
   if(MARCAS[i.marca] && MARCAS[i.marca].alcohol && !store.get("nf_18")) return ageSheet(i.marca);
@@ -634,8 +634,7 @@ async function send(){
   if(mode==="evento" && !eventoOk) return closedSheet();
   if(mode==="evento" && !cart.some(l=>l.unit>0)){
     // Una bebida a la vez por celular: revisa en la base los pedidos guardados que aún no se cargan
-    for(const m of mine){ if(!data[m.id]){ try{ const s = await getDoc(doc(db,"pedidos",m.id)); if(s.exists()) data[m.id] = {id:m.id, ...s.data()}; }catch{} } }
-    const a = activeEvento(); if(a) return lockSheet(a);
+    const a = await activeEventoFresco(); if(a) return lockSheet(a);
   }
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
   const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
@@ -704,6 +703,17 @@ function loadMine(){
   saveMine();
 }
 function saveMine(){ store.set("nf_mis", JSON.stringify(mine.map(m=>({id:m.id,t:m.t})))); }
+// Antes de bloquear, confirma con el servidor: si el celular estuvo dormido, el dato guardado puede estar viejo
+async function activeEventoFresco(){
+  for(const m of mine){
+    const p = data[m.id];
+    if(!p || (p.modo==="evento" && p.evento===E && p.estado!=="entregado" && p.estado!=="cancelado")){
+      try{ const s = await getDocFromServer(doc(db,"pedidos",m.id)); if(s.exists()) data[m.id] = {id:m.id, ...s.data()}; }
+      catch{ try{ const s = await getDoc(doc(db,"pedidos",m.id)); if(s.exists()) data[m.id] = {id:m.id, ...s.data()}; }catch{} }
+    }
+  }
+  return activeEvento();
+}
 function activeEvento(){ if(STAFF) return null; return mine.map(m=>data[m.id]).find(p=>p && p.modo==="evento" && p.evento===E && !(p.total>0) && p.estado!=="entregado" && p.estado!=="cancelado"); }
 
 function track(id){

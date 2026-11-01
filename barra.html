@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="50">
+<meta name="app-ver" content="51">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -853,11 +853,14 @@ function nombreVenta(it){
 }
 // ===== Conteo de invitados y bebidas por invitado (eventos) =====
 // Cada pedido de evento trae en "ref" el celular ("dev:...") o, si lo capturó la barra, el nombre ("barra:...").
-const invKey = p => p.ref && /^(dev|barra):/.test(p.ref) ? p.ref : "id:"+p.id;
+// Pedidos sin dato del celular (app vieja en el cel del invitado): se agrupan por nombre, que la app rellena sola en ese celular
+const invNom = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]/g,"");
+const invKey = p => p.ref && /^dev:/.test(p.ref) ? p.ref : "nom:"+invNom(p.nombre);
 function invStats(){
   const vivos = pedidos.filter(p=>p.modo==="evento" && p.estado!=="cancelado").slice().sort((a,b)=>(a.creado?.toMillis?.()||Date.now())-(b.creado?.toMillis?.()||Date.now()));
-  const vez = {}, cuenta = {};
-  vivos.forEach(p=>{ const k = invKey(p); cuenta[k] = (cuenta[k]||0)+1; vez[p.id] = cuenta[k]; });
+  const vez = {}, cuenta = {}, nomDev = {};
+  vivos.forEach(p=>{ if(p.ref && /^dev:/.test(p.ref)) nomDev["nom:"+invNom(p.nombre)] = p.ref; });
+  vivos.forEach(p=>{ let k = invKey(p); if(nomDev[k]) k = nomDev[k]; cuenta[k] = (cuenta[k]||0)+1; vez[p.id] = cuenta[k]; });
   return {vez, cuenta, invitados: Object.keys(cuenta).length};
 }
 let invAviso = {};
