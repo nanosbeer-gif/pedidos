@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="51">
+<meta name="app-ver" content="52">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -15,7 +15,7 @@
 <title>Barra Nano's Fizz</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
-<script src="menu.js?v=34"></script>
+<script src="menu.js?v=35"></script>
 <style>
 [hidden]{display:none!important}
 /* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
@@ -632,12 +632,26 @@ async function setAgotado(key, val){
   agotados = nuevo; render();
   try{ await setDoc(doc(db,"config","menu"), {agotados: nuevo}); }catch{ alert("No se pudo guardar. Revisa el internet."); }
 }
+// Insumos que se pueden agotar en todo el menú: opciones de las bebidas (escarchados, toppings, banderillas, ingredientes, sabores) y extras
+const insName = o => { const t = String(o||"").replace(/^(Extra|Con)\s+/i,"").replace(/\s*\(.*\)\s*$/,"").trim(); return t.charAt(0).toUpperCase()+t.slice(1); };
+function insumosLista(){
+  const set = new Set();
+  NFM.ITEMS.forEach(i=>(i.groups||[]).forEach(g=>{ if(/^(Preparación|Refresco)$/i.test(g.name)) return; g.opts.forEach(o=>{ if(!/^sin\b/i.test(o)) set.add(insName(o)); }); }));
+  Object.values(NFM.EXTRAS||{}).forEach(l=>l.forEach(x=>set.add(insName(x.n))));
+  return [...set].sort((a,b)=>a.localeCompare(b,"es"));
+}
 function menuView(){
   const cats = NFM.CATS.filter(c=>c.marca===menuMarca);
   const nAg = NFM.ITEMS.filter(i=>i.marca===menuMarca && agotados[i.id]).length;
   return `<div class="crumb"><button class="sec" data-home>← Inicio</button><div><b>Bebidas disponibles</b></div></div>
     <p class="hint">Toca una bebida o un sabor para marcarlo como <b>agotado</b>. Los clientes lo ven al instante y no lo pueden pedir. Vuelve a tocarlo cuando ya tengas insumo.</p>
     <div class="evb" style="margin-bottom:10px">${Object.entries(NFM.MARCAS).map(([k,m])=>`<button class="sec${menuMarca===k?" on":""}" data-mmarca="${k}">${m.name}</button>`).join("")}</div>
+    ${(()=>{ const ins = insumosLista(), off = ins.filter(n=>agotados["ins:"+n]); return `<details class="insbox" ${off.length?"open":""} style="margin:0 0 12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px">
+      <summary style="cursor:pointer;font-weight:800">🧂 Insumos y toppings ${off.length?`<span style="color:#e01b1b">· ${off.length} agotado${off.length===1?"":"s"}</span>`:"· todos disponibles"}</summary>
+      <p class="hint" style="margin:8px 0">Si se te acaba un insumo (ej. crema batida, Miguelito, gomitas), tócalo aquí y desaparece de <b>todas</b> las bebidas al instante.</p>
+      <input type="search" id="insQ" placeholder="Buscar insumo…" style="margin-bottom:8px">
+      <div class="sab" id="insChips">${ins.map(n=>{ const k = "ins:"+n, so = !!agotados[k]; return `<button class="schip${so?" off":""}" data-ag="${esc(k)}" data-insn="${esc(n.toLowerCase())}">${esc(n)}${so?" · agotado":""}</button>`; }).join("")}</div>
+    </details>`; })()}
     ${nAg?`<p class="nocomp" style="margin:0 0 8px">${nAg} ${nAg===1?"bebida agotada":"bebidas agotadas"}</p>`:""}
     ${cats.map(c=>`<h2>${esc(c.name)}</h2><div class="mlist">${NFM.ITEMS.filter(i=>i.cat===c.id && i.marca===menuMarca).map(i=>{
       const off = !!agotados[i.id];
@@ -941,6 +955,7 @@ async function manEnviar(){
   }catch{ btn.disabled = false; btn.textContent = "Enviar a la cola"; err.textContent = "No se pudo enviar. Revisa que el evento siga abierto y el internet."; }
 }
 document.addEventListener("change", e=>{ if(e.target.id==="manIt") manOps(); });
+document.addEventListener("input", e=>{ if(e.target.id!=="insQ") return; const q = e.target.value.trim().toLowerCase(); document.querySelectorAll("#insChips [data-insn]").forEach(b=>{ b.hidden = q && !b.dataset.insn.includes(q); }); });
 
 // ===== Copiar ventas de domicilio para el HTML de ventas =====
 // Entra: entregados (venta) y cancelados que sí se prepararon (merma, $0). Fuera: cancelados sin preparar y pendientes.

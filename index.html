@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="53">
+<meta name="app-ver" content="55">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -194,7 +194,7 @@ body[data-marca="beer"] h1{color:#ffd23f;text-shadow:0 0 14px #ffd23f55}
 <button class="wafab" id="waFab" data-wa hidden><svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path fill="currentColor" d="M12 3C6.9 3 3 6.6 3 11c0 2.3 1.1 4.4 2.9 5.9L5 21l4.3-2.1c.9.2 1.8.3 2.7.3 5.1 0 9-3.6 9-8.1S17.1 3 12 3zm-4 9.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm4 0a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg><span id="waTxt">WhatsApp</span></button>
 <div class="sheetbg" id="sheetBg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 
-<script src="menu.js?v=34"></script>
+<script src="menu.js?v=35"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, getDoc, getDocFromServer, updateDoc, setDoc, increment, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -214,7 +214,9 @@ const { MARCAS, CATS: ALLCATS, ITEMS, EXTRAS, FOTOS } = window.NF_MENU;
 let marca = "fizz", agotados = {}, tienda = null, alcoholDom = false;
 const curCats = () => ALLCATS.filter(c=>(c.marca===marca || c.todas) && !(c.soloDom && mode==="evento")).sort((a,b)=>(a.todas?1:0)-(b.todas?1:0));
 const marcasEvento = () => !E ? (alcoholDom ? ["fizz","beer"] : ["fizz"]) : (evento && evento.marca==="ambos") ? ["fizz","beer"] : [(evento && evento.marca) || "fizz"];
-const isAgotado = (id, sabor) => !!agotados[sabor ? id+"|"+sabor : id];
+const insName = o => { const t = String(o||"").replace(/^(Extra|Con)\s+/i,"").replace(/\s*\(.*\)\s*$/,"").trim(); return t.charAt(0).toUpperCase()+t.slice(1); };
+// Agotado: la bebida, un sabor de esa bebida, o un insumo en todo el menú (ej. "Crema batida", "Miguelito")
+const isAgotado = (id, sabor) => !!agotados[sabor ? id+"|"+sabor : id] || !!(sabor && agotados["ins:"+insName(sabor)]);
 // Envío: $20 con 1 bebida; gratis desde 2 bebidas
 function envioBase(){ const n = cart.reduce((a,l)=>a+l.qty,0); return n>=2 ? 0 : 20; }
 // ===== Cupones =====
@@ -285,7 +287,7 @@ function renderWA(){
     box.innerHTML = `<div class="contra"><b>¿Te gustó la barra? 🎉</b><p>Llévanos a tu fiesta: XV años, bodas, cumpleaños y más.</p><button class="wabtn" data-wa>${WA_ICON}<span>Pedir información por WhatsApp</span></button></div>`;
   }
 }
-const TRANSFER = { banco:"Plata", titular:"Adrián Sánchez González", clabe:"646198405606567407" };
+const TRANSFER = { banco:"Plata", titular:"Adrián Sánchez González", clabe:"646194405601220316" };
 
 let cat = "todas", cart = [], pendingBeep = false;
 const QS = new URLSearchParams(location.search);
@@ -400,7 +402,7 @@ function renderChips(){
   const all = [{id:"todas",name:"Todas"}, ...curCats()];
   $("#chips").innerHTML = all.map(c=>`<button class="chip" data-c="${c.id}" aria-pressed="${cat===c.id}">${c.name}</button>`).join("");
 }
-function cupStyle(i){ const [a,b]=i.color.split(","); return `background:linear-gradient(${a},${b})`; }
+function cupStyle(i){ const [a,b]=(i.color||"#ffd23f,#e08a00").split(","); return `background:linear-gradient(${a},${b})`; }
 function renderMenu(){
   const cats = cat==="todas" ? curCats() : curCats().filter(c=>c.id===cat);
   $("#menu").innerHTML = cats.map(c=>`<h2>${c.name}</h2><div class="list">${
@@ -456,7 +458,7 @@ function openItem(id){
       <label class="opt"><input type="radio" name="size" id="s1" value="0" checked><span>½ litro${mode==="domicilio"?" · "+precioHTML(i.price):""}</span></label>
       <label class="opt"><input type="radio" name="size" id="s2" value="1"><span>1 litro${mode==="domicilio"?" · "+precioHTML(i.price+EXTRA_LITRO):""}</span></label>
     </div></div>`}${g}
-    ${mode==="domicilio" && (EXTRAS[i.id]||[]).length ? `<div class="grp"><b>Extras</b><div class="opts">${EXTRAS[i.id].map((x,xi)=>`<label class="opt"><input type="checkbox" name="ex" id="ex${xi}" value="${xi}"><span>${esc(x.n)} · +${money(x.p)}</span></label>`).join("")}</div></div>` : ""}
+    ${mode==="domicilio" && (EXTRAS[i.id]||[]).length ? `<div class="grp"><b>Extras</b><div class="opts">${EXTRAS[i.id].map((x,xi)=>{ const ag = !!agotados["ins:"+insName(x.n)]; return `<label class="opt${ag?" off":""}"><input type="checkbox" name="ex" id="ex${xi}" value="${xi}" ${ag?"disabled":""}><span>${esc(x.n)}${ag?" · agotado":" · +"+money(x.p)}</span></label>`; }).join("")}</div></div>` : ""}
     ${i.sinAlcohol && mode==="evento"?`<label class="sa" for="sinAlc"><input type="checkbox" id="sinAlc"><span><b>Sin alcohol</b><small>Márcala si la quieres sin alcohol</small></span></label>`:""}
     <label class="f" for="itemNote">¿Algo más? (opcional)<textarea class="t" id="itemNote" maxlength="120" placeholder="Ej. poco hielo, sin limón"></textarea></label>
     ${mode==="domicilio"?`<div class="qty"><button data-q="-1" aria-label="Menos">−</button><output id="q">1</output><button data-q="1" aria-label="Más">+</button></div>`:""}
