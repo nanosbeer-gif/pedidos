@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="55">
+<meta name="app-ver" content="56">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -15,7 +15,7 @@
 <title>Barra Nano's Fizz</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
-<script src="menu.js?v=38"></script>
+<script src="menu.js?v=39"></script>
 <style>
 [hidden]{display:none!important}
 /* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
@@ -444,7 +444,8 @@ function render(){
 function homeView(){
   const cards = eventos.map(e=>`
     <article class="evc">
-      <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.fisicas?(e.fisicas.length>1?"Barras ":"Barra ")+e.fisicas.join(", "):e.barras+" "+(e.barras>1?"barras":"barra")} · ${({fizz:"Fizz",beer:"Beer 🍺",ambos:"Fizz + Beer 🍺"})[e.marca||"fizz"]}</small></div>
+      <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.fisicas?(e.fisicas.length>1?"Barras ":"Barra ")+e.fisicas.join(", "):e.barras+" "+(e.barras>1?"barras":"barra")} · ${menusTxt(e)}</small></div>
+      ${menusBtns(e)}
       <div class="evb">
         ${Array.from({length:e.barras},(_,k)=>`<button class="go" data-cola="${e.id}" data-b="${e.barras>1?k+1:0}">${e.barras>1?bName(e,k+1):"Abrir pedidos"}</button>`).join("")}
         ${e.barras>1?`<button class="sec" data-cola="${e.id}" data-b="0">Todas las barras</button>`:""}
@@ -478,7 +479,7 @@ function homeView(){
         <div class="fis"><b>¿Qué barras llevas a este evento?</b><small>Sus QR fijos quedarán apuntando a este evento.</small>
           <div class="fisg">${Array.from({length:FISICAS},(_,i)=>{ const n = i+1, oc = asign[n] && eventos.some(x=>x.id===asign[n].e); return `<label class="fx${oc?" oc":""}" for="fis${n}"><input type="checkbox" id="fis${n}" value="${n}" ${oc?"disabled":""}><span>Barra ${n}${oc?`<small>${esc(ev(asign[n].e)?.nombre||"ocupada")}</small>`:""}</span></label>`; }).join("")}</div>
         </div>
-        <label for="evMarca">Menú del evento<select id="evMarca"><option value="fizz">Nano's Fizz (sin alcohol)</option><option value="beer">Nano's Beer (con alcohol)</option><option value="ambos">Ambos menús</option></select></label>
+        <fieldset class="evms" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px"><legend style="font-weight:800;padding:0 6px">Menús del evento</legend>${Object.entries(NFM.MARCAS).map(([k,m])=>`<label style="display:flex;gap:10px;align-items:center;font-weight:700;margin:6px 0"><input type="checkbox" name="evM" value="${k}" ${k==="fizz"?"checked":""} style="width:22px;height:22px"> ${MICON[k]||""} ${esc(m.name)}${m.alcohol?" <small style=\"color:var(--muted)\">(con alcohol)</small>":""}</label>`).join("")}</fieldset>
         <button class="go" type="submit" id="evBtn">Crear evento</button>
         <p class="err" id="evErr"></p>
       </form>
@@ -816,7 +817,7 @@ function pantallaView(){
   const prep = mine.filter(p=>p.estado==="preparando" || p.estado==="nuevo");
   const tag = p => `<div class="tvn"><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
   return `<div class="tvwrap">
-    <header class="tvh">${logosDe(e.marca||"fizz").map(im=>`<img src="${im.getAttribute("src")}" alt="">`).join("")}<div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>${bName(e,sel.barra)}</p>`:""}</div>
+    <header class="tvh">${logosDe(evMarcas(e)).map(im=>`<img src="${im.getAttribute("src")}" alt="">`).join("")}<div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>${bName(e,sel.barra)}</p>`:""}</div>
       <button class="sec tvx" data-salirtv>Salir</button></header>
     <div class="tvcols">
       <section class="tvlist"><h2>🥤 ¡Listas! Pasa por tu bebida</h2><div class="tvgrid big">${listos.length?listos.map(tag).join(""):`<p class="tvempty">Aquí aparecen los números listos</p>`}</div></section>
@@ -857,9 +858,9 @@ function resumenView(){
 
 // Nombre para ventas/dashboard: separa las bebidas que existen en Fizz (sin alcohol) y en Beer (con alcohol)
 function nombreVenta(it){
-  const n = it.nombre||"", fz = NFM.ITEMS.find(i=>i.marca==="fizz" && i.name===n), br = NFM.ITEMS.find(i=>i.marca==="beer" && i.name===n);
+  const n = it.nombre||"", fz = NFM.ITEMS.find(i=>i.marca==="fizz" && i.name===n), br = NFM.ITEMS.find(i=>(i.marca==="beer"||i.marca==="bar") && i.name===n);
   if(!br) return n;
-  const esBeer = it.marca ? it.marca==="beer" : (!fz || (!it.tam && !fz.noSize));
+  const esBeer = it.marca ? (it.marca==="beer"||it.marca==="bar") : (!fz || (!it.tam && !fz.noSize));
   if(!esBeer) return n;
   const sinAlc = (it.opciones||[]).some(o=>/SIN ALCOHOL/i.test(o));
   if(sinAlc) return fz ? n : n+" sin alcohol";
@@ -904,7 +905,7 @@ function vezBadge(p){
 
 // ===== Pedido capturado en la barra (invitado sin celular) =====
 let man = null;
-function manItems(e){ const ms = e.marca==="ambos" ? ["fizz","beer"] : [e.marca||"fizz"]; return NFM.ITEMS.filter(i=>ms.includes(i.marca) || NFM.CATS.find(c=>c.id===i.cat && c.todas && !c.soloDom)); }
+function manItems(e){ const ms = evMarcas(e); return NFM.ITEMS.filter(i=>ms.includes(i.marca) || NFM.CATS.find(c=>c.id===i.cat && c.todas && !c.soloDom)); }
 function manOpen(){
   const e = ev(sel.evento); if(!e) return;
   man = {e, item: ""};
@@ -956,6 +957,16 @@ async function manEnviar(){
 }
 document.addEventListener("change", e=>{ if(e.target.id==="manIt") manOps(); });
 document.addEventListener("input", e=>{ if(e.target.id!=="insQ") return; const q = e.target.value.trim().toLowerCase(); document.querySelectorAll("#insChips [data-insn]").forEach(b=>{ b.hidden = q && !b.dataset.insn.includes(q); }); });
+
+// ===== Menús por evento (Fizz / Beer / Bar) =====
+const evMarcas = e => { const l = e && Array.isArray(e.marcas) && e.marcas.length ? e.marcas : (e && e.marca==="ambos") ? ["fizz","beer"] : [(e && e.marca) || "fizz"]; const ok = l.filter(k=>NFM.MARCAS[k]); return ok.length ? ok : ["fizz"]; };
+const marcaVieja = l => l.includes("fizz") && l.includes("beer") ? "ambos" : l.includes("beer") ? "beer" : "fizz";
+const MICON = {fizz:"🍹", beer:"🍺", bar:"🍸"};
+function menusTxt(e){ return evMarcas(e).map(k=>NFM.MARCAS[k].name.replace("Nano's ","")+(k==="fizz"?"":" "+MICON[k])).join(" + "); }
+function menusBtns(e){
+  const on = evMarcas(e);
+  return `<small style="display:block;margin:6px 0 4px;color:var(--muted);font-weight:700">Menús de este evento (toca para activar o quitar):</small><div class="evb">${Object.keys(NFM.MARCAS).map(k=>`<button class="sec${on.includes(k)?" on":""}" data-evm="${e.id}" data-m="${k}" aria-pressed="${on.includes(k)}" style="${on.includes(k)?"border-color:var(--neon);color:var(--neon);font-weight:800":"opacity:.6"}">${MICON[k]||""} ${esc(NFM.MARCAS[k].name)} ${on.includes(k)?"✓":""}</button>`).join("")}</div>`;
+}
 
 // ===== Copiar ventas de domicilio para el HTML de ventas =====
 // Entra: entregados (venta) y cancelados que sí se prepararon (merma, $0). Fuera: cancelados sin preparar y pendientes.
@@ -1019,8 +1030,9 @@ async function copiarDash(id){
 
 // ===== Tarjeta QR (canvas) =====
 const logoImg = new Image(); logoImg.src = "logo.png";
+const barImg = new Image(); barImg.src = (NFM.MARCAS.bar||{}).logo || "logo.png";
 const beerImg = new Image(); beerImg.src = "logo-beer.png";
-function logosDe(marca){ return marca==="ambos" ? [logoImg, beerImg] : marca==="beer" ? [beerImg] : [logoImg]; }
+function logosDe(marca){ const l = Array.isArray(marca) ? marca : marca==="ambos" ? ["fizz","beer"] : [marca||"fizz"]; return l.map(k=>({fizz:logoImg, beer:beerImg, bar:barImg})[k]).filter(Boolean); }
 const imgOk = im => im.complete && im.naturalWidth;
 function drawQRs(){
   const e = sel.view==="fijos" ? FIJO_EV : ev(sel.evento); if(!e || !window.qrcode) return;
@@ -1030,7 +1042,7 @@ function drawQRs(){
       const c = cv.getContext ? cv.getContext("2d") : null, W=1200, H=1800; if(!c) return;
       const g = c.createRadialGradient(W/2,0,50,W/2,0,900); g.addColorStop(0,"#3a1d7a"); g.addColorStop(1,"#140a2e");
       c.fillStyle = g; c.fillRect(0,0,W,H);
-      const lg = logosDe(cv.dataset.marca||e.marca||"fizz"), ls = lg.length>1 ? 230 : 260, lw = lg.length*ls + (lg.length-1)*30;
+      const lg = logosDe(cv.dataset.marca==="ambos" ? "ambos" : evMarcas(e)), ls = lg.length>1 ? 230 : 260, lw = lg.length*ls + (lg.length-1)*30;
       lg.forEach((im,i)=>{ if(imgOk(im)) c.drawImage(im, (W-lw)/2 + i*(ls+30), 60 + (260-ls)/2, ls, ls); });
       c.textAlign = "center"; c.fillStyle = "#7dff3a"; c.font = "800 80px 'Lilita One', 'Arial Rounded MT Bold', sans-serif";
       c.fillText("¡Pide tu bebida!", W/2, 410);
@@ -1064,7 +1076,7 @@ function drawTents(){
   if(!ready()){ logoImg.addEventListener("load", drawTents, {once:true}); beerImg.addEventListener("load", drawTents, {once:true}); return; }
   
   document.querySelectorAll(".tentc").forEach(cv=>{
-    const marca = cv.dataset.marca || e.marca || "fizz", logos = logosDe(marca);
+    const marca = cv.dataset.marca==="ambos" ? ["fizz","beer"] : evMarcas(e), logos = logosDe(marca);
     const b = +cv.dataset.b, url = cv.dataset.url || `${BASE}?e=${e.id}${e.barras>1?"&b="+b:""}`, en = cv.dataset.nombre || e.nombre, bl = bName(e,b);
     const draw = ()=>{
       const c = cv.getContext ? cv.getContext("2d") : null; if(!c) return;
@@ -1106,7 +1118,7 @@ function drawTents(){
         c.fillStyle = "#b9a9e6"; c.font = "700 40px Nunito, sans-serif"; wrap(c, d, x, 560, colW - 50, 50);
       });
       c.fillStyle = "#ffc53d"; c.font = "800 44px Nunito, sans-serif"; c.textAlign = "center";
-      c.fillText("Una bebida a la vez · No cierres la página mientras esperas" + (marca!=="fizz" ? " · Alcohol solo +18" : ""), FW/2, FH - 70);
+      c.fillText("Una bebida a la vez · No cierres la página mientras esperas" + (marca.some(k=>(NFM.MARCAS[k]||{}).alcohol) ? " · Alcohol solo +18" : ""), FW/2, FH - 70);
       c.restore();
       // ---- Base: logos
       c.save(); c.translate(M, yC); let bx = FW/2 - (logos.length*300 - 40)/2;
@@ -1178,15 +1190,16 @@ document.addEventListener("submit", async e=>{
   }
   if(e.target.id!=="evForm") return;
   e.preventDefault();
-  const nombre = $("#evNombre").value.trim(), personas = parseInt($("#evPersonas").value,10), marca = $("#evMarca").value;
+  const nombre = $("#evNombre").value.trim(), personas = parseInt($("#evPersonas").value,10), marcas = [...document.querySelectorAll('input[name="evM"]:checked')].map(x=>x.value), marca = marcaVieja(marcas);
   const fisicas = [...document.querySelectorAll('.fisg input:checked')].map(x=>+x.value), barras = Math.max(1, fisicas.length);
   if(!fisicas.length){ $("#evErr").textContent = "Elige al menos una barra."; return; }
   if(!nombre || !(personas>0)){ $("#evErr").textContent = "Pon el nombre y el número de personas."; return; }
+  if(!marcas.length){ $("#evErr").textContent = "Elige al menos un menú."; return; }
   $("#evBtn").disabled = true;
   try{
-    const ref = await addDoc(collection(db,"eventos"), {nombre, personas, barras, fisicas, marca, estado:"activo", creado: serverTimestamp()});
+    const ref = await addDoc(collection(db,"eventos"), {nombre, personas, barras, fisicas, marca, marcas, estado:"activo", creado: serverTimestamp()});
     const na = {...asign}; fisicas.forEach((n,i)=>{ na[n] = {e: ref.id, b: i+1}; }); await guardarAsign(na);
-    if(!ev(ref.id)) eventos.unshift({id:ref.id, nombre, personas, barras, fisicas, marca, estado:"activo", creado:null});
+    if(!ev(ref.id)) eventos.unshift({id:ref.id, nombre, personas, barras, fisicas, marca, marcas, estado:"activo", creado:null});
     go({view:"qr", evento: ref.id});
   }catch{ $("#evErr").textContent = "No se pudo crear. Revisa el internet."; $("#evBtn").disabled = false; }
 });
@@ -1239,6 +1252,11 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.hno!==undefined){ hist.confirmar = false; render(); }
   else if(t.dataset.hdel!==undefined){ borrarHist(); }
   else if(t.dataset.mmarca){ menuMarca = t.dataset.mmarca; render(); }
+  else if(t.dataset.evm){ const e = ev(t.dataset.evm); if(!e) return; const cur = evMarcas(e), k = t.dataset.m;
+    const l = cur.includes(k) ? cur.filter(x=>x!==k) : Object.keys(NFM.MARCAS).filter(x=>cur.includes(x)||x===k);
+    if(!l.length){ alert("El evento necesita al menos un menú."); return; }
+    e.marcas = l; e.marca = marcaVieja(l); render();
+    try{ await updateDoc(doc(db,"eventos",e.id), {marcas:l, marca:e.marca}); }catch{ alert("No se pudo guardar. Revisa el internet."); } }
   else if(t.dataset.ag){ setAgotado(t.dataset.ag, !agotados[t.dataset.ag]); }
   else if(t.dataset.vercerr!==undefined){ t.disabled = true; t.textContent = "Cargando…"; cargarCerrados(); }
   else if(t.dataset.reabrir){
