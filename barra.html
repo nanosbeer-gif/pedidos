@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="57">
+<meta name="app-ver" content="58">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -779,7 +779,7 @@ function card(p){
     <header><div class="n">${esc(p.numero)}</div>
       <div class="who"><b>${esc(p.nombre)}</b>${vezBadge(p)}<small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
     <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}<b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
-      ${(it.opciones||[]).includes("🚫 SIN ALCOHOL")?`<div class="sinalc">🚫 SIN ALCOHOL</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
+      ${(it.opciones||[]).includes("🚫 SIN ALCOHOL") || (p.modo==="evento" && it.marca==="fizz")?`<div class="sinalc">🚫 SIN ALCOHOL${it.marca==="fizz"?" · Nano's Fizz":""}</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
       ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
     ${p.modo==="evento" && p.total>0 ? `<div style="margin-top:10px;background:#ff3b4e;color:#fff;border-radius:10px;padding:8px 10px;font-weight:800">💵 COBRAR ${money(p.total)} · costo extra, no incluido en el evento</div>` : ""}
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>

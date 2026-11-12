@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="60">
+<meta name="app-ver" content="61">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -151,6 +151,8 @@ body[data-marca="bar"] .card{border-color:#c9a22755}
 @keyframes vpulse{0%,100%{box-shadow:0 0 0 4px rgba(255,122,0,.25)}50%{box-shadow:0 0 0 10px rgba(255,122,0,.45)}}
 .vaso label{display:flex;gap:10px;align-items:center;margin-top:10px;font-weight:800;font-size:15px;cursor:pointer}.vaso input{width:24px;height:24px;flex:none;accent-color:#1a0b3a}
 @media (prefers-reduced-motion:reduce){.vaso.big{animation:none}}
+.alcnote{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#e01b1b;color:#fff;font-weight:800;font-size:14.5px;line-height:1.35;text-align:center;border:2px solid #fff3}
+.alcnote small{display:block;font-weight:600;font-size:12.5px;opacity:.95}
 .sa{display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid var(--line);cursor:pointer}
 .sa input{width:24px;height:24px;accent-color:var(--neon);flex:none}
 .sa b{display:block;font-size:15px}.sa small{color:var(--muted);font-size:12.5px}
@@ -185,6 +187,7 @@ body[data-marca="bar"] .card{border-color:#c9a22755}
   <div id="menuWrap">
     <p class="note" id="modeNote"></p>
     <nav class="brands" id="brands" hidden></nav>
+    <p class="alcnote" id="alcNote" hidden></p>
     <section id="mine" hidden></section>
     <nav class="chips" id="chips" aria-label="Categorías"></nav>
     <main id="menu"></main>
@@ -427,6 +430,8 @@ function renderBrand(){
   const M = MARCAS[marca];
   $("#brandLogo").src = M.logo; $("#brandName").textContent = M.name;
   document.body.dataset.marca = marca;
+  const an = $("#alcNote"), AN = {bar:`🍸 Este menú es solo CON ALCOHOL<small>¿Lo quieres sin alcohol? Pídelo en el menú de Nano's Fizz.</small>`, fizz:`🚫 Menú SIN ALCOHOL`};
+  an.hidden = !AN[marca]; an.innerHTML = AN[marca] || "";
   const nav = $("#brands"); nav.hidden = ms.length < 2;
   nav.innerHTML = ms.map(k=>`<button class="brand" data-marca="${k}" aria-pressed="${k===marca}"><img src="${MARCAS[k].logo}" alt="">${MARCAS[k].name}</button>`).join("");
 }
