@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="56">
+<meta name="app-ver" content="57">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -15,7 +15,7 @@
 <title>Barra Nano's Fizz</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
-<script src="menu.js?v=39"></script>
+<script src="menu.js?v=40"></script>
 <style>
 [hidden]{display:none!important}
 /* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
@@ -137,6 +137,12 @@ body.tv .top{display:none}
 .mtog b{font-size:12.5px;padding:5px 10px;border-radius:999px;background:var(--neon);color:#1a0b3a;white-space:nowrap}
 .mi.off .mtog b{background:var(--pink);color:#fff}
 .mi.off .mtog span{opacity:.6;text-decoration:line-through}
+.mi.nd{border-color:#777;border-style:dashed;opacity:.75}
+.mi.nd .mtog b{background:#555;color:#fff}
+.mi.nd .mtog span{opacity:.5}
+.schip.nd{border-style:dashed;border-color:#777;color:#999;text-decoration:line-through}
+.lg{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--neon);color:#1a0b3a}
+.lg.ag{background:var(--pink);color:#fff}.lg.nd{background:#555;color:#fff}
 .sab{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .schip{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:999px;border:1.5px solid var(--line)}
 .schip.off{border-color:var(--pink);color:var(--pink);text-decoration:line-through}
@@ -446,6 +452,7 @@ function homeView(){
     <article class="evc">
       <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.fisicas?(e.fisicas.length>1?"Barras ":"Barra ")+e.fisicas.join(", "):e.barras+" "+(e.barras>1?"barras":"barra")} · ${menusTxt(e)}</small></div>
       ${menusBtns(e)}
+      <div class="evb" style="margin-bottom:6px"><button class="sec" data-menuctx="${e.id}">🥤 Bebidas de este evento</button></div>
       <div class="evb">
         ${Array.from({length:e.barras},(_,k)=>`<button class="go" data-cola="${e.id}" data-b="${e.barras>1?k+1:0}">${e.barras>1?bName(e,k+1):"Abrir pedidos"}</button>`).join("")}
         ${e.barras>1?`<button class="sec" data-cola="${e.id}" data-b="0">Todas las barras</button>`:""}
@@ -618,49 +625,70 @@ async function borrarHist(){
   render();
 }
 
-// ===== Menú: disponible / agotado =====
+// ===== Menú: disponible / agotado / no disponible — por contexto (domicilio o cada evento) =====
 const NFM = window.NF_MENU;
-let agotados = {}, tienda = null, menuMarca = "fizz", freshForm = false, alcoholDom = false;
+let menuCfg = {}, agotados = {}, tienda = null, menuMarca = "fizz", freshForm = false, alcoholDom = false;
+let menuCtx = (()=>{ try{ return localStorage.getItem("nb_menuctx") || "dom"; }catch{ return "dom"; } })();
+// true = agotado · "nd" = no disponible para este evento/domicilio (ni se muestra)
+const agDe = ctx => (ctx==="dom" ? menuCfg.agotados : (menuCfg.ev && menuCfg.ev[ctx])) || {};
+function ctxValido(){ if(menuCtx!=="dom" && eventosLoaded && !eventos.some(e=>e.id===menuCtx)) menuCtx = "dom"; agotados = agDe(menuCtx); }
+function setMenuCtx(c){ menuCtx = c; try{ localStorage.setItem("nb_menuctx", c); }catch{} ctxValido(); }
+const ctxMarcas = () => menuCtx==="dom" ? ["fizz","beer"] : evMarcas(eventos.find(e=>e.id===menuCtx));
+const ctxItem = i => menuCtx!=="dom" || (i.marca!=="bar" && !(i.marca==="beer" && !i.price));
 function listenConfig(){
-  onSnapshot(doc(db,"config","menu"), s=>{ agotados = (s.exists() && s.data().agotados) || {}; if(["menu","home"].includes(sel.view)) render(); }, ()=>{});
+  onSnapshot(doc(db,"config","menu"), s=>{ menuCfg = s.exists() ? s.data() : {}; ctxValido(); if(["menu","home"].includes(sel.view)) render(); }, ()=>{});
   onSnapshot(doc(db,"config","alcohol"), s=>{ alcoholDom = !!(s.exists() && s.data().domicilio); if(sel.view==="home") render(); }, ()=>{});
   onSnapshot(doc(db,"config","cupones"), s=>{ cupones = (s.exists() && s.data().codigos) || {}; if(sel.view==="cupones") render(); }, ()=>{});
   onSnapshot(doc(db,"config","barras"), s=>{ asign = (s.exists() && s.data().asign) || {}; if(["home","fijos"].includes(sel.view)) render(); }, ()=>{});
   onSnapshot(doc(db,"config","tienda"), s=>{ tienda = s.exists() ? s.data() : null; if(["horario","home"].includes(sel.view)){ freshForm = true; render(); } }, ()=>{});
 }
+// Toque: disponible → agotado → no disponible → disponible
+const sigEstado = v => v===true ? "nd" : v==="nd" ? null : true;
 async function setAgotado(key, val){
-  const nuevo = {...agotados}; if(val) nuevo[key] = true; else delete nuevo[key];
+  const ctx = menuCtx, nuevo = {...agDe(ctx)}; if(val) nuevo[key] = val; else delete nuevo[key];
+  if(ctx==="dom") menuCfg = {...menuCfg, agotados: nuevo}; else menuCfg = {...menuCfg, ev: {...(menuCfg.ev||{}), [ctx]: nuevo}};
   agotados = nuevo; render();
-  try{ await setDoc(doc(db,"config","menu"), {agotados: nuevo}); }catch{ alert("No se pudo guardar. Revisa el internet."); }
+  const ref = doc(db,"config","menu"), campo = ctx==="dom" ? "agotados" : "ev."+ctx;
+  try{ await updateDoc(ref, campo, nuevo); }
+  catch{ try{ await setDoc(ref, ctx==="dom" ? {agotados: nuevo} : {ev: {[ctx]: nuevo}}, {merge:true}); }catch{ alert("No se pudo guardar. Revisa el internet."); } }
 }
 // Insumos que se pueden agotar en todo el menú: opciones de las bebidas (escarchados, toppings, banderillas, ingredientes, sabores) y extras
 const insName = o => { const t = String(o||"").replace(/^(Extra|Con)\s+/i,"").replace(/\s*\(.*\)\s*$/,"").trim(); return t.charAt(0).toUpperCase()+t.slice(1); };
 function insumosLista(){
-  const set = new Set();
-  NFM.ITEMS.forEach(i=>(i.groups||[]).forEach(g=>{ if(/^(Preparación|Refresco)$/i.test(g.name)) return; g.opts.forEach(o=>{ if(!/^sin\b/i.test(o)) set.add(insName(o)); }); }));
-  Object.values(NFM.EXTRAS||{}).forEach(l=>l.forEach(x=>set.add(insName(x.n))));
+  const set = new Set(), ms = ctxMarcas();
+  NFM.ITEMS.filter(i=>ms.includes(i.marca) && ctxItem(i)).forEach(i=>(i.groups||[]).forEach(g=>{ if(/^(Preparación|Refresco)$/i.test(g.name)) return; g.opts.forEach(o=>{ if(!/^sin\b/i.test(o)) set.add(insName(o)); }); }));
+  if(menuCtx==="dom") Object.values(NFM.EXTRAS||{}).forEach(l=>l.forEach(x=>set.add(insName(x.n))));
   return [...set].sort((a,b)=>a.localeCompare(b,"es"));
 }
+const stTxt = (v, f) => v===true ? (f?"Agotada":"agotado") : v==="nd" ? "No disponible" : "Disponible";
+const stCls = v => v===true ? " off" : v==="nd" ? " nd" : "";
 function menuView(){
+  ctxValido();
+  const ms = ctxMarcas(); if(!ms.includes(menuMarca)) menuMarca = ms[0];
+  const ev = eventos.find(e=>e.id===menuCtx);
   const cats = NFM.CATS.filter(c=>c.marca===menuMarca);
-  const nAg = NFM.ITEMS.filter(i=>i.marca===menuMarca && agotados[i.id]).length;
+  const its = NFM.ITEMS.filter(i=>i.marca===menuMarca && ctxItem(i));
+  const nAg = its.filter(i=>agotados[i.id]===true).length, nNd = its.filter(i=>agotados[i.id]==="nd").length;
   return `<div class="crumb"><button class="sec" data-home>← Inicio</button><div><b>Bebidas disponibles</b></div></div>
-    <p class="hint">Toca una bebida o un sabor para marcarlo como <b>agotado</b>. Los clientes lo ven al instante y no lo pueden pedir. Vuelve a tocarlo cuando ya tengas insumo.</p>
-    <div class="evb" style="margin-bottom:10px">${Object.entries(NFM.MARCAS).map(([k,m])=>`<button class="sec${menuMarca===k?" on":""}" data-mmarca="${k}">${m.name}</button>`).join("")}</div>
+    <p class="hint" style="margin-bottom:6px"><b>¿Para dónde?</b> Cada evento y el domicilio se manejan por separado.</p>
+    <div class="evb" style="margin-bottom:12px"><button class="sec${menuCtx==="dom"?" on":""}" data-menuctx="dom">🛵 Domicilio</button>${eventos.map(e=>`<button class="sec${menuCtx===e.id?" on":""}" data-menuctx="${e.id}">🎉 ${esc(e.nombre)}</button>`).join("")}</div>
+    <p class="hint">Estás editando: <b>${menuCtx==="dom"?"🛵 Domicilio":"🎉 "+esc(ev?ev.nombre:"")}</b>. Toca una bebida para cambiarla:<br>
+      <span class="lg">Disponible</span> → <span class="lg ag">Agotada</span> (se ve pero no se puede pedir) → <span class="lg nd">No disponible</span> (ni aparece en el menú) → otra vez Disponible.</p>
+    ${ms.length>1?`<div class="evb" style="margin-bottom:10px">${ms.map(k=>`<button class="sec${menuMarca===k?" on":""}" data-mmarca="${k}">${NFM.MARCAS[k].name}</button>`).join("")}</div>`:""}
     ${(()=>{ const ins = insumosLista(), off = ins.filter(n=>agotados["ins:"+n]); return `<details class="insbox" ${off.length?"open":""} style="margin:0 0 12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px">
-      <summary style="cursor:pointer;font-weight:800">🧂 Insumos y toppings ${off.length?`<span style="color:#e01b1b">· ${off.length} agotado${off.length===1?"":"s"}</span>`:"· todos disponibles"}</summary>
-      <p class="hint" style="margin:8px 0">Si se te acaba un insumo (ej. crema batida, Miguelito, gomitas), tócalo aquí y desaparece de <b>todas</b> las bebidas al instante.</p>
+      <summary style="cursor:pointer;font-weight:800">🧂 Insumos y toppings ${off.length?`<span style="color:#e01b1b">· ${off.length} sin servir</span>`:"· todos disponibles"}</summary>
+      <p class="hint" style="margin:8px 0">Si se te acaba un insumo (ej. crema batida, Miguelito, gomitas), tócalo aquí y cambia en <b>todas</b> las bebidas de ${menuCtx==="dom"?"domicilio":"este evento"}.</p>
       <input type="search" id="insQ" placeholder="Buscar insumo…" style="margin-bottom:8px">
-      <div class="sab" id="insChips">${ins.map(n=>{ const k = "ins:"+n, so = !!agotados[k]; return `<button class="schip${so?" off":""}" data-ag="${esc(k)}" data-insn="${esc(n.toLowerCase())}">${esc(n)}${so?" · agotado":""}</button>`; }).join("")}</div>
+      <div class="sab" id="insChips">${ins.map(n=>{ const k = "ins:"+n, v = agotados[k]; return `<button class="schip${stCls(v)}" data-ag="${esc(k)}" data-insn="${esc(n.toLowerCase())}">${esc(n)}${v?" · "+stTxt(v):""}</button>`; }).join("")}</div>
     </details>`; })()}
-    ${nAg?`<p class="nocomp" style="margin:0 0 8px">${nAg} ${nAg===1?"bebida agotada":"bebidas agotadas"}</p>`:""}
-    ${cats.map(c=>`<h2>${esc(c.name)}</h2><div class="mlist">${NFM.ITEMS.filter(i=>i.cat===c.id && i.marca===menuMarca).map(i=>{
-      const off = !!agotados[i.id];
-      const sabores = (i.groups||[]).filter(g=>/sabor/i.test(g.name)).flatMap(g=>g.opts);
-      return `<div class="mi${off?" off":""}">
-        <button class="mtog" data-ag="${i.id}" aria-pressed="${!off}"><span>${esc(i.name)}</span><b>${off?"Agotada":"Disponible"}</b></button>
-        ${!off && sabores.length?`<div class="sab">${sabores.map(o=>{ const k = i.id+"|"+o, so = !!agotados[k]; return `<button class="schip${so?" off":""}" data-ag="${esc(k)}">${esc(o)}${so?" · agotado":""}</button>`; }).join("")}</div>`:""}
-      </div>`; }).join("")}</div>`).join("")}`;
+    ${nAg||nNd?`<p class="nocomp" style="margin:0 0 8px">${[nAg?`${nAg} agotada${nAg===1?"":"s"}`:"", nNd?`${nNd} no disponible${nNd===1?"":"s"}`:""].filter(Boolean).join(" · ")}</p>`:""}
+    ${cats.map(c=>{ const l = its.filter(i=>i.cat===c.id); return l.length ? `<h2>${esc(c.name)}</h2><div class="mlist">${l.map(i=>{
+      const v = agotados[i.id];
+      const sabores = (i.groups||[]).filter(g=>/sabor|preparación|refresco/i.test(g.name)).flatMap(g=>g.opts);
+      return `<div class="mi${stCls(v)}">
+        <button class="mtog" data-ag="${i.id}" aria-pressed="${!v}"><span>${esc(i.name)}</span><b>${stTxt(v,1)}</b></button>
+        ${!v && sabores.length?`<div class="sab">${sabores.map(o=>{ const k = i.id+"|"+o, so = agotados[k]; return `<button class="schip${stCls(so)}" data-ag="${esc(k)}">${esc(o)}${so?" · "+stTxt(so):""}</button>`; }).join("")}</div>`:""}
+      </div>`; }).join("")}</div>` : ""; }).join("")}`;
 }
 // ===== Horario de domicilio =====
 const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -1257,7 +1285,8 @@ document.addEventListener("click", async e=>{
     if(!l.length){ alert("El evento necesita al menos un menú."); return; }
     e.marcas = l; e.marca = marcaVieja(l); render();
     try{ await updateDoc(doc(db,"eventos",e.id), {marcas:l, marca:e.marca}); }catch{ alert("No se pudo guardar. Revisa el internet."); } }
-  else if(t.dataset.ag){ setAgotado(t.dataset.ag, !agotados[t.dataset.ag]); }
+  else if(t.dataset.ag){ setAgotado(t.dataset.ag, sigEstado(agotados[t.dataset.ag])); }
+  else if(t.dataset.menuctx){ setMenuCtx(t.dataset.menuctx); if(sel.view!=="menu") go({view:"menu"}); else render(); }
   else if(t.dataset.vercerr!==undefined){ t.disabled = true; t.textContent = "Cargando…"; cargarCerrados(); }
   else if(t.dataset.reabrir){
     t.disabled = true;

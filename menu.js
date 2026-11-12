@@ -43,13 +43,13 @@ ITEMS: [
   {marca:"bar",id:"nb_medias",cat:"nb_coct",name:"Medias de Seda",color:"#f7a8c0,#e05a7a",desc:"Jugo de cereza, ron blanco, leche condensada y canela.",groups:[],noSize:true},
   {marca:"bar",id:"nb_gin",cat:"nb_coct",name:"Gin tonic",color:"#dff3e6,#8fd19e",desc:"Ginebra con limón y agua tónica.",groups:[],noSize:true},
   {marca:"bar",id:"nb_mezcalita",cat:"nb_coct",name:"Mezcalita Jamaica",color:"#b0123a,#ff6a3d",desc:"Mezcal artesanal sabor jamaica, escarchado con Tajín.",groups:[{name:"Escarchado",opts:["Tajín","Sin escarchado"]}],noSize:true},
-  {marca:"bar",id:"nb_mojito",cat:"nb_moj",name:"Mojito natural",color:"#c9f29b,#5fbf3a",desc:"Ron blanco, Sprite, agua mineral, jugo de limón, azúcar y hierbabuena.",groups:[],noSize:true,sinAlcohol:true},
-  {marca:"bar",id:"nb_mojitofr",cat:"nb_moj",name:"Mojito frutos rojos",color:"#ff4d6d,#b5172e",desc:"Ron blanco, frutos rojos triturados, sirope de frutos rojos, agua mineral, Sprite, un toque de limón, azúcar y menta o hierbabuena.",groups:[],noSize:true,sinAlcohol:true},
-  {marca:"bar",id:"nb_cuba",cat:"nb_ron",name:"Quemadita o Cuba libre",color:"#5a2a0e,#2b1306",desc:"Ron, Coca-Cola, mineral, toque de limón y sal.",groups:[{name:"Preparación",opts:["Quemadita (con sal y limón)","Cuba libre (sin sal ni limón)"]}],noSize:true},
-  {marca:"bar",id:"nb_pina",cat:"nb_ron",name:"Piña colada",color:"#fff4c2,#f3c94b",desc:"Ron, jugo de piña, lechera, crema de coco, un toque de canela y hielo frapé.",groups:[],noSize:true,sinAlcohol:true},
-  {marca:"bar",id:"nb_paloma",cat:"nb_teq",name:"Paloma",color:"#e8f4ff,#9fd0ff",desc:"Tequila, sal, Squirt y un toque de limón.",groups:[{name:"Escarchado",opts:["Sal y limón (tradicional)","Tamarindo","Sin escarchado"]},{name:"Banderilla",opts:["Sin banderilla","Gomitas","Tamarindo"]}],noSize:true},
-  {marca:"bar",id:"nb_sunrise",cat:"nb_teq",name:"Tequila Sunrise",color:"#ffb347,#e0263a",desc:"Tequila, jugo de naranja, agua mineral y granadina.",groups:[{name:"Banderilla",opts:["Sin banderilla","Gomitas","Tamarindo"]}],noSize:true},
-  {marca:"bar",id:"nb_margarita",cat:"nb_teq",name:"Margarita",color:"#e9f7b0,#9ccc3a",desc:"Tequila, licor de naranja, limón, azúcar y sal, o de frutos rojos.",groups:[{name:"Sabor",opts:["Clásica de limón","Frutos rojos"]},{name:"Escarchado",opts:["Sal","Azúcar","Sin escarchado"]}],noSize:true},
+  {marca:"bar",id:"nb_mojito",cat:"nb_moj",name:"Mojito natural",color:"#c9f29b,#5fbf3a",desc:"Ron blanco, Sprite, agua mineral, jugo de limón, azúcar y hierbabuena.",groups:[],noSize:true},
+  {marca:"bar",id:"nb_mojitofr",cat:"nb_moj",name:"Mojito frutos rojos",color:"#ff4d6d,#b5172e",desc:"Ron blanco, frutos rojos triturados, sirope de frutos rojos, agua mineral, Sprite, un toque de limón, azúcar y menta o hierbabuena.",groups:[],noSize:true},
+  {marca:"bar",id:"nb_cuba",cat:"nb_ron",name:"Quemadita o Cuba libre",color:"#5a2a0e,#2b1306",desc:"Ron, Coca-Cola, mineral, toque de limón y sal.",groups:[{name:"Preparación",opts:["Quemadita (con sal y limón)","Cuba libre (sin sal ni limón)"]},{name:"Refresco",opts:["Solo Coca-Cola","Campechana (mitad Coca, mitad mineral)","Pintada (mineral y un toque de Coca)"]}],noSize:true},
+  {marca:"bar",id:"nb_pina",cat:"nb_ron",name:"Piña colada",color:"#fff4c2,#f3c94b",desc:"Ron, jugo de piña, lechera, crema de coco, un toque de canela y hielo frapé.",groups:[],noSize:true},
+  {marca:"bar",id:"nb_paloma",cat:"nb_teq",name:"Paloma",color:"#e8f4ff,#9fd0ff",desc:"Tequila, sal, Squirt y un toque de limón.",groups:[{name:"Escarchado",opts:["Sal y limón (tradicional)","Tamarindo","Sin escarchado"]}],noSize:true},
+  {marca:"bar",id:"nb_sunrise",cat:"nb_teq",name:"Tequila Sunrise",color:"#ffb347,#e0263a",desc:"Tequila, jugo de naranja, agua mineral y granadina.",groups:[],noSize:true},
+  {marca:"bar",id:"nb_margarita",cat:"nb_teq",name:"Margarita",color:"#e9f7b0,#9ccc3a",desc:"Tequila, licor de naranja, limón, jarabe natural y sal, o de frutos rojos.",groups:[{name:"Sabor",opts:["Clásica de limón","Frutos rojos"]},{name:"Preparación",opts:["Frapeada","Líquida"]},{name:"Escarchado",opts:["Sal","Sin escarchado"]}],noSize:true},
   {marca:"bar",id:"nb_cantarito",cat:"nb_teq",name:"Cantarito tequilero",color:"#ff8a3d,#c2410c",desc:"Tequila preparado, servido en su jarrito de barro escarchado.",groups:[],noSize:true},
   {marca:"beer",id:"b_cerveza",price:100,cat:"cerveza",name:"Cerveza sola",color:"#ffd23f,#e08a00",desc:"Solo la cerveza bien fría, sin escarchado ni preparación.",groups:[{name:"Cerveza",opts:["Clara","Oscura"]}],noSize:true},
   {marca:"beer",id:"b_sola",price:100,cat:"cerveza",name:"Nano sola",desc:"Cerveza solo con limón y sal.",groups:[{name:"Cerveza",opts:["Clara","Oscura"]},{name:"Escarchado",opts:["Ajonjolí","Miguelito","Sal y limón","Sin escarchado"]},{name:"Banderilla",opts:["Sin banderilla","Gomitas","Tamarindo"]}],noSize:true},
@@ -123,7 +123,7 @@ FOTOS: {
 (function(M){
   M.ITEMS.filter(i=>i.marca==="beer" && i.cat==="cerveza").forEach(i=>{
     const id = "nb_"+i.id.replace(/^b_/,"");
-    M.ITEMS.push({...i, marca:"bar", id, cat:"nb_cerv", price:undefined});
+    M.ITEMS.push({...i, marca:"bar", id, cat:"nb_cerv", price:undefined, sinAlcohol:false, groups:i.groups.filter(g=>g.name!=="Banderilla")});
     if(M.FOTOS[i.id]) M.FOTOS[id] = M.FOTOS[i.id];
   });
 })(window.NF_MENU);
