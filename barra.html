@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="62">
+<meta name="app-ver" content="63">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -154,8 +154,13 @@ body.tv .top{display:none}
 .mtog:focus-visible,.schip:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
 @keyframes invp{0%,100%{box-shadow:0 0 0 0 rgba(224,27,27,.6)}50%{box-shadow:0 0 0 8px rgba(224,27,27,0)}}
 .bn{display:inline-block;font-size:21px;font-weight:900;line-height:1.15;letter-spacing:.2px}
+.bn.lg{font-size:18px}
+.nrow{display:flex;align-items:center;gap:8px}
+.nrow .bn{min-width:0}
+.nrow .tags{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:none}
+.nrow .tam{margin:0}
 .bn.bx{padding:4px 12px;border-radius:9px;box-shadow:0 0 0 2px #fff3}
-.sa0{display:inline-block;vertical-align:middle;margin-left:6px;background:#e01b1b;color:#fff;font-weight:800;font-size:11.5px;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.sa0{display:inline-block;background:#e01b1b;color:#fff;font-weight:800;font-size:11.5px;border-radius:6px;padding:2px 7px;white-space:nowrap}
 .sinalc{display:inline-block;margin-top:4px;background:#e01b1b;color:#fff;font-weight:900;font-size:14px;border-radius:6px;padding:3px 10px;border:2px solid #fff;letter-spacing:.3px}
 .hr{display:grid;gap:10px}
 .hday{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
@@ -807,9 +812,10 @@ const contraste = hex => { const h = hex.replace("#",""); if(h.length!==6) retur
 function bebidaTag(it){
   const n = normB(it.nombre), c = BCOL.find(x=>x[0].test(n)), e = emoDe(BEMO, it.nombre);
   const txt = `${(it.cant||1)>1 || p_modoActual==="domicilio" ? (it.cant||1)+"× " : ""}${e?e+" ":""}${esc(it.nombre)}`;
-  if(!c) return `<b class="bn">${txt}</b>`;
+  const lg = String(it.nombre||"").length > 15 ? " lg" : "";
+  if(!c) return `<b class="bn${lg}">${txt}</b>`;
   const bg = c[1], fg = c[2] || contraste(bg);
-  return bg ? `<b class="bn bx" style="background:${bg};color:${fg}">${txt}</b>` : `<b class="bn" style="color:${fg}">${txt}</b>`;
+  return bg ? `<b class="bn bx${lg}" style="background:${bg};color:${fg}">${txt}</b>` : `<b class="bn${lg}" style="color:${fg}">${txt}</b>`;
 }
 // El sabor va en grande debajo del nombre; el resto de opciones en la línea chica
 const saborDe = it => { const o = (it.opciones||[]).find(o=>/^Sabor:\s*/.test(o)); const v = o ? o.replace(/^Sabor:\s*/,"").trim() : ""; return v && v!=="—" ? v : ""; };
@@ -820,7 +826,7 @@ function card(p){
   return `<article class="ord ${p.modo}">
     <header><div class="n">${esc(p.numero)}</div>
       <div class="who"><b>${esc(p.nombre)}</b>${vezBadge(p)}<small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
-    <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}${bebidaTag(it)}${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}${esSinAlc(p,it)?`<span class="sa0">🚫 Sin alcohol</span>`:""}
+    <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}<div class="nrow">${bebidaTag(it)}${it.tam||esSinAlc(p,it)?`<span class="tags">${it.tam?`<span class="tam">${esc(it.tam)}</span>`:""}${esSinAlc(p,it)?`<span class="sa0">🚫 Sin alcohol</span>`:""}</span>`:""}</div>
       ${saborDe(it)?`<div class="sab0">${emoDe(SEMO, saborDe(it))} ${esc(saborDe(it))}</div>`:""}
       ${opsResto(it).length?`<div class="op">${opsResto(it).map(esc).join(" · ")}</div>`:""}
       ${it.nota && !(esSinAlc(p,it) && /^\s*sin\s+alcohol\W*$/i.test(it.nota))?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
