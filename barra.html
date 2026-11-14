@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="67">
+<meta name="app-ver" content="68">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -118,7 +118,13 @@ body.tv .top{display:none}
 .tvn b{display:block;font-family:var(--display);font-weight:400;font-size:clamp(30px,34cqi,64px);line-height:1.05;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tvn span{display:block;font-weight:800;font-size:clamp(14px,1.8vw,22px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .big .tvn{background:var(--neon);color:#1a0b3a;animation:pop .6s ease-out}
-.big .tvn b{color:#1a0b3a;font-size:clamp(40px,38cqi,110px)}
+.big .tvn b{color:#1a0b3a;font-size:clamp(34px,24cqi,72px)}
+.big .tvn span{font-size:clamp(22px,15cqi,44px);line-height:1.15;margin-top:2px}
+.tvn span{font-size:clamp(16px,12cqi,26px)}
+.big .tvn.t1{background:#a87900;color:#1a0b3a;animation:tvblink .8s steps(1) 3}
+.big .tvn.t2{background:#e01b1b;color:#fff;animation:tvblink .8s steps(1) 3}
+.big .tvn.t2 b{color:#fff}
+@keyframes tvblink{0%{background:#e01b1b;color:#fff}50%{background:#1a0b3a;color:#fff}}
 @keyframes pop{from{transform:scale(.6);opacity:0}}
 .tvempty{color:var(--muted);grid-column:1/-1;text-align:center;padding:20px}
 .tvfoot{text-align:center;color:var(--muted);font-weight:700;margin:0}
@@ -942,17 +948,28 @@ function qrView(){
     <p class="hint">Hoja tamaño carta para imprimir y doblar en triángulo: de un lado el QR y del otro las instrucciones. Mantén presionada la imagen → <b>Guardar imagen</b>, imprímela en <b>cartulina carta al 100%</b>, recorta por la orilla, dobla en las líneas punteadas y pega la pestaña bajo la base.${e.barras>1?" Hay una por barra: pon en cada mesa la de la barra más cercana.":""}</p>
     <div class="tents">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="tentc" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}" data-nombre="Barra ${e.fisicas[k]}" data-marca="ambos"`:""} width="2550" height="3300" hidden></canvas><img class="tenti" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}"`:""} alt="Tarjeta de mesa"><figcaption>${e.barras>1?"Tarjeta · "+bName(e,k+1):"Tarjeta de mesa"}</figcaption></figure>`).join("")}</div>`;
 }
+const TV_T1 = 10*60000, TV_T2 = 15*60000;
+let tvLista = (()=>{ try{ return JSON.parse(localStorage.getItem("nf_tvlista")||"{}"); }catch{ return {}; } })();
+setInterval(()=>{ if(sel.view==="pantalla" && pedidos.some(p=>p.estado==="lista")) render(); }, 5000);
 function pantallaView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
   const mine = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
   const listos = mine.filter(p=>p.estado==="lista").slice().reverse();
   const prep = mine.filter(p=>p.estado==="preparando" || p.estado==="nuevo");
   const tag = p => `<div class="tvn"><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
+  // Cuánto lleva cada bebida en ¡Lista! (lo mide esta pantalla, que siempre está prendida)
+  const now = Date.now(); let cambio = false;
+  listos.forEach(p=>{ if(!tvLista[p.id]){ tvLista[p.id] = now; cambio = true; } });
+  if(pedLoaded) for(const id in tvLista) if(!listos.some(p=>p.id===id)){ delete tvLista[id]; cambio = true; }
+  if(cambio) try{ localStorage.setItem("nf_tvlista", JSON.stringify(tvLista)); }catch{}
+  // 10 min sin recoger: parpadea 3 veces en rojo y queda amarillo oscuro · 15 min: parpadea 3 veces y queda rojo
+  const tagL = p => { const t = now - tvLista[p.id], st = t>=TV_T2 ? "t2" : t>=TV_T1 ? "t1" : "", d = t - (st==="t2"?TV_T2:TV_T1);
+    return `<div class="tvn ${st}"${st?` style="animation-delay:-${d}ms"`:""}><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`; };
   return `<div class="tvwrap">
     <header class="tvh">${logosDe(evMarcas(e)).map(im=>`<img src="${im.getAttribute("src")}" alt="">`).join("")}<div><h1>${esc(e.nombre)}</h1>${sel.barra?`<p>${bName(e,sel.barra)}</p>`:""}</div>
       <button class="sec tvx" data-salirtv>Salir</button></header>
     <div class="tvcols">
-      <section class="tvlist"><h2>🥤 ¡Listas! Pasa por tu bebida</h2><div class="tvgrid big">${listos.length?listos.map(tag).join(""):`<p class="tvempty">Aquí aparecen los números listos</p>`}</div></section>
+      <section class="tvlist"><h2>🥤 ¡Listas! Pasa por tu bebida</h2><div class="tvgrid big">${listos.length?listos.map(tagL).join(""):`<p class="tvempty">Aquí aparecen los números listos</p>`}</div></section>
       <section class="tvprep"><h2>Preparando</h2><div class="tvgrid">${prep.length?prep.map(tag).join(""):`<p class="tvempty">—</p>`}</div></section>
     </div>
     <p class="tvfoot">Escanea el QR, pide tu bebida y espera tu número aquí</p>
