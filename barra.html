@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="58">
+<meta name="app-ver" content="60">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -15,7 +15,7 @@
 <title>Barra Nano's Fizz</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
-<script src="menu.js?v=40"></script>
+<script src="menu.js?v=41"></script>
 <style>
 [hidden]{display:none!important}
 /* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
@@ -137,6 +137,10 @@ body.tv .top{display:none}
 .mtog b{font-size:12.5px;padding:5px 10px;border-radius:999px;background:var(--neon);color:#1a0b3a;white-space:nowrap}
 .mi.off .mtog b{background:var(--pink);color:#fff}
 .mi.off .mtog span{opacity:.6;text-decoration:line-through}
+.svc{display:block;width:100%;margin:0 0 10px;padding:12px;border-radius:14px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:center;border:2px solid}
+.svc b{display:block;font-size:13px;margin-top:3px;opacity:.9}
+.svc.off{background:#3a0d12;border-color:#e01b1b;color:#ffb3b3}
+.svc.on{background:#0d3a1e;border-color:#25d366;color:#b6ffd0}
 .mi.nd{border-color:#777;border-style:dashed;opacity:.75}
 .mi.nd .mtog b{background:#555;color:#fff}
 .mi.nd .mtog span{opacity:.5}
@@ -451,6 +455,7 @@ function homeView(){
   const cards = eventos.map(e=>`
     <article class="evc">
       <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.fisicas?(e.fisicas.length>1?"Barras ":"Barra ")+e.fisicas.join(", "):e.barras+" "+(e.barras>1?"barras":"barra")} · ${menusTxt(e)}</small></div>
+      ${servicioBtn(e)}
       ${menusBtns(e)}
       <div class="evb" style="margin-bottom:6px"><button class="sec" data-menuctx="${e.id}">🥤 Bebidas de este evento</button></div>
       <div class="evb">
@@ -724,6 +729,10 @@ function horarioView(){
       <p class="err" id="hrMsg"></p>
     </form>`;
 }
+// Servicio: los invitados ven el menú pero no pueden pedir hasta que abras la barra (abierto:false). Eventos viejos sin el campo = abiertos.
+const servicioBtn = e => e.abierto===false
+  ? `<button class="svc off" data-servicio="${e.id}" data-v="1">🔴 Barra cerrada · los invitados solo ven el menú<b>Toca para ABRIR el servicio</b></button>`
+  : `<button class="svc on" data-servicio="${e.id}" data-v="0">🟢 Barra abierta · recibiendo pedidos<b>Toca para cerrar el servicio</b></button>`;
 function colaView(){
   const e = ev(sel.evento), titulo = sel.evento==="domicilio" ? "Domicilio" : (e?.nombre||"Evento");
   const list0 = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
@@ -735,6 +744,7 @@ function colaView(){
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">${bName(e,sel.barra)}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
     ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
     ${sel.evento==="domicilio"?`<button class="sec" data-ventas style="width:100%;margin:0 0 10px">📋 Copiar ventas para el HTML de ventas <small style="opacity:.75">(${RANGOS.find(r=>r[0]===domRango)?.[1]||""})</small></button>`:""}
+    ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? servicioBtn(e) : ""}
     ${sel.evento!=="domicilio" ? invBanner(e) : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<a class="sec" href="index.html?e=${encodeURIComponent(sel.evento)}&b=${sel.barra||1}&staff=1" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;box-sizing:border-box;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular) · abre el menú</a>`:""}
     <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
@@ -1225,9 +1235,9 @@ document.addEventListener("submit", async e=>{
   if(!marcas.length){ $("#evErr").textContent = "Elige al menos un menú."; return; }
   $("#evBtn").disabled = true;
   try{
-    const ref = await addDoc(collection(db,"eventos"), {nombre, personas, barras, fisicas, marca, marcas, estado:"activo", creado: serverTimestamp()});
+    const ref = await addDoc(collection(db,"eventos"), {nombre, personas, barras, fisicas, marca, marcas, estado:"activo", abierto:false, creado: serverTimestamp()});
     const na = {...asign}; fisicas.forEach((n,i)=>{ na[n] = {e: ref.id, b: i+1}; }); await guardarAsign(na);
-    if(!ev(ref.id)) eventos.unshift({id:ref.id, nombre, personas, barras, fisicas, marca, marcas, estado:"activo", creado:null});
+    if(!ev(ref.id)) eventos.unshift({id:ref.id, nombre, personas, barras, fisicas, marca, marcas, estado:"activo", abierto:false, creado:null});
     go({view:"qr", evento: ref.id});
   }catch{ $("#evErr").textContent = "No se pudo crear. Revisa el internet."; $("#evBtn").disabled = false; }
 });
@@ -1286,6 +1296,10 @@ document.addEventListener("click", async e=>{
     e.marcas = l; e.marca = marcaVieja(l); render();
     try{ await updateDoc(doc(db,"eventos",e.id), {marcas:l, marca:e.marca}); }catch{ alert("No se pudo guardar. Revisa el internet."); } }
   else if(t.dataset.ag){ setAgotado(t.dataset.ag, sigEstado(agotados[t.dataset.ag])); }
+  else if(t.dataset.servicio){ const e = ev(t.dataset.servicio), ab = t.dataset.v==="1";
+    if(!ab && !t.dataset.ok){ t.dataset.ok = "1"; t.querySelector("b").textContent = "¿Seguro? Toca otra vez para CERRAR"; setTimeout(()=>{ delete t.dataset.ok; if(t.isConnected) render(); }, 4000); return; }
+    if(e) e.abierto = ab; render();
+    updateDoc(doc(db,"eventos",t.dataset.servicio), {abierto: ab}).catch(()=>alert("No se pudo guardar. Revisa el internet.")); }
   else if(t.dataset.menuctx){ setMenuCtx(t.dataset.menuctx); if(sel.view!=="menu") go({view:"menu"}); else render(); }
   else if(t.dataset.vercerr!==undefined){ t.disabled = true; t.textContent = "Cargando…"; cargarCerrados(); }
   else if(t.dataset.reabrir){
