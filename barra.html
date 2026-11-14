@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="60">
+<meta name="app-ver" content="61">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -152,6 +152,9 @@ body.tv .top{display:none}
 .schip.off{border-color:var(--pink);color:var(--pink);text-decoration:line-through}
 .mtog:focus-visible,.schip:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
 @keyframes invp{0%,100%{box-shadow:0 0 0 0 rgba(224,27,27,.6)}50%{box-shadow:0 0 0 8px rgba(224,27,27,0)}}
+.bn{display:inline-block;font-size:21px;font-weight:900;line-height:1.15;letter-spacing:.2px}
+.bn.bx{padding:4px 12px;border-radius:9px;box-shadow:0 0 0 2px #fff3}
+.sa0{display:inline-block;vertical-align:middle;margin-left:6px;background:#e01b1b;color:#fff;font-weight:800;font-size:11.5px;border-radius:6px;padding:2px 7px;white-space:nowrap}
 .sinalc{display:inline-block;margin-top:4px;background:#e01b1b;color:#fff;font-weight:900;font-size:14px;border-radius:6px;padding:3px 10px;border:2px solid #fff;letter-spacing:.3px}
 .hr{display:grid;gap:10px}
 .hday{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
@@ -783,14 +786,34 @@ function ligaHTML(p){
     ${tel.length===10?`<a class="maplnk" href="https://wa.me/52${tel}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">💬 Abrir WhatsApp del cliente</a>`:`<small>Sin teléfono válido</small>`}
   </div>`;
 }
+// ===== Color fijo por bebida (para que el bartender la identifique de un vistazo) =====
+// [patrón del nombre, fondo, letra opcional]. Si no se da letra, se calcula el contraste (clara → negra, oscura → blanca).
+const BCOL = [
+  [/frutos rojos/,"#d6245a"], [/pitufina/,"#c8102e"], [/pitufo/,"#1a5cff"], [/barbie/,"#ff3fa4"], [/linterna/,"#22b14c"],
+  [/sangr/,"#7a1030"], [/mojito/,"#9be15d"], [/^ice$/,"#e0263a"], [/mangonada/,"#ff8a1c"], [/soda/,"#ffd23f"],
+  [/frapp/,"#b07a4f"], [/bubble|tapioca/,"#9b7bd6"], [/pina colada/,"#ffffff"], [/clamato/,"#7a0f1d"],
+  [/tradicional/,"#6b3e1d","#ffd23f"], [/special/,"#111111","#ffd23f"], [/(nano|cerveza) sola/,"","#ffd23f"],
+  [/caribe/,"#1ec8c8"], [/cuba|quemadita/,"#4a230c"], [/bubbaloo/,"#ff7ac0"], [/paloma/,"#8fd3ff"],
+  [/sunrise/,"linear-gradient(90deg,#ff9a1f,#e0263a)","#000"], [/clericot/,"#7a1030"], [/medias/,"#f7a8c0"], [/gin/,"#d9dde0"],
+  [/mezcalita/,"#7b1fa2"], [/margarita/,"#c9e86b"], [/cantarito/,"#e0662a"], [/papas/,"#ff7a1a"]
+];
+const normB = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+const contraste = hex => { const h = hex.replace("#",""); if(h.length!==6) return "#fff"; const [r,g,b] = [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)); return (0.299*r+0.587*g+0.114*b) > 150 ? "#000" : "#fff"; };
+function bebidaTag(it){
+  const n = normB(it.nombre), c = BCOL.find(x=>x[0].test(n)), txt = `${it.cant}× ${esc(it.nombre)}`;
+  if(!c) return `<b class="bn">${txt}</b>`;
+  const bg = c[1], fg = c[2] || contraste(bg);
+  return bg ? `<b class="bn bx" style="background:${bg};color:${fg}">${txt}</b>` : `<b class="bn" style="color:${fg}">${txt}</b>`;
+}
+const esSinAlc = (p,it) => (it.opciones||[]).includes("🚫 SIN ALCOHOL") || (p.modo==="evento" && it.marca==="fizz");
 function card(p){
   p_modoActual = p.modo;
   return `<article class="ord ${p.modo}">
     <header><div class="n">${esc(p.numero)}</div>
       <div class="who"><b>${esc(p.nombre)}</b>${vezBadge(p)}<small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
-    <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}<b>${it.cant}× ${esc(it.nombre)}</b>${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}
-      ${(it.opciones||[]).includes("🚫 SIN ALCOHOL") || (p.modo==="evento" && it.marca==="fizz")?`<div class="sinalc">🚫 SIN ALCOHOL${it.marca==="fizz"?" · Nano's Fizz":""}</div>`:""}${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
-      ${it.nota?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
+    <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}${bebidaTag(it)}${it.tam?` <span class="tam">${esc(it.tam)}</span>`:""}${esSinAlc(p,it)?`<span class="sa0">🚫 Sin alcohol</span>`:""}
+      ${(it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL").length?`<div class="op">${it.opciones.filter(o=>o!=="🚫 SIN ALCOHOL").map(esc).join(" · ")}</div>`:""}
+      ${it.nota && !(esSinAlc(p,it) && /^\s*sin\s+alcohol\W*$/i.test(it.nota))?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
     ${p.modo==="evento" && p.total>0 ? `<div style="margin-top:10px;background:#ff3b4e;color:#fff;border-radius:10px;padding:8px 10px;font-weight:800">💵 COBRAR ${money(p.total)} · costo extra, no incluido en el evento</div>` : ""}
     ${p.modo==="domicilio"?`<div class="dom"><div>📞 <span class="sel">${esc(p.tel)}</span></div>
       <div>📍 ${esc(p.direccion)}${p.ref?` <small>(${esc(p.ref)})</small>`:""}</div>
