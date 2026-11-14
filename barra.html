@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="64">
+<meta name="app-ver" content="67">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -59,7 +59,7 @@ h2{font-family:var(--display);font-weight:400;font-size:21px;color:var(--gold);m
 .ord header{display:flex;gap:12px;align-items:center}
 .ord .n{font-family:var(--display);font-size:38px;line-height:1;color:var(--neon);font-variant-numeric:tabular-nums}
 .ord.domicilio .n{color:var(--gold)}
-.who{min-width:0}.who b{display:block;font-size:17px;overflow-wrap:anywhere}.who small{color:var(--muted);font-weight:700}
+.who{min-width:0}.who b{display:block;font-size:23px;line-height:1.15;overflow-wrap:anywhere}.who small{color:var(--muted);font-weight:700}
 .ord ul{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
 .ord li{background:var(--panel2);border-radius:10px;padding:8px 10px}
 .tam{font-size:12px;font-weight:800;background:var(--bg);border-radius:6px;padding:1px 6px;margin-left:4px}
@@ -138,7 +138,11 @@ body.tv .top{display:none}
 .mtog b{font-size:12.5px;padding:5px 10px;border-radius:999px;background:var(--neon);color:#1a0b3a;white-space:nowrap}
 .mi.off .mtog b{background:var(--pink);color:#fff}
 .mi.off .mtog span{opacity:.6;text-decoration:line-through}
-.bvbtn{display:block;width:100%;margin:0 0 10px;font-weight:800}
+.tab.tarde{background:#e01b1b;border-color:#fff;color:#fff;animation:btblink 1s steps(2) infinite}
+.ord.tarde{border-color:#e01b1b;border-left-color:#e01b1b;box-shadow:0 0 0 2px #e01b1b}
+.crono2{display:inline-block;margin:0 0 8px;font-weight:900;font-size:13px;padding:3px 10px;border-radius:999px}
+.crono2.v{background:#1f9d4c;color:#fff}.crono2.a{background:#ffd23f;color:#000}.crono2.r{background:#e01b1b;color:#fff}
+.bvbtn{display:block;width:100%;box-sizing:border-box;margin:0 0 10px;font-weight:800}
 body.bt .top h1,body.bt .top img,body.bt #outBtn{display:none}
 .bthead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
 .bthead b{font-size:22px;display:block}.bthead small{color:var(--muted)}
@@ -148,14 +152,17 @@ body.bt .top h1,body.bt .top img,body.bt #outBtn{display:none}
 .btlist{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
 .btc{background:var(--panel);border:1px solid var(--line);border-left:8px solid var(--neon);border-radius:16px;padding:14px}
 .btc header{display:flex;align-items:center;gap:12px}
-.btn0{font-family:var(--display);font-size:64px;line-height:1;color:var(--neon);font-variant-numeric:tabular-nums}
+.btn0{font-family:var(--display);font-size:38px;line-height:1;color:var(--neon);font-variant-numeric:tabular-nums}
 .btwho b{display:block;font-size:18px}
 .crono{display:inline-block;margin-top:4px;font-weight:900;font-size:13px;padding:2px 8px;border-radius:999px}
 .crono.v{background:#1f9d4c;color:#fff}.crono.a{background:#ffd23f;color:#000}.crono.r{background:#e01b1b;color:#fff}
 .btc ul{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
 .btc li{background:var(--panel2);border-radius:10px;padding:10px}
-.btlista{all:unset;cursor:pointer;box-sizing:border-box;display:block;width:100%;margin-top:12px;text-align:center;font-weight:900;font-size:24px;padding:18px;border-radius:14px;background:var(--neon);color:#1a0b3a}
+.btlista{all:unset;cursor:pointer;box-sizing:border-box;display:block;width:100%;margin-top:12px;text-align:center;font-weight:900;font-size:18px;padding:11px;border-radius:12px;background:var(--neon);color:#1a0b3a}
 .btlista[disabled]{opacity:.5}
+.btop{font-size:18px;font-weight:900;color:#ffe08a;margin-top:5px;line-height:1.25}
+.btop span{font-weight:700;color:var(--muted);font-size:14px}
+.btnota{font-size:17px;font-weight:800}
 .btempty{text-align:center;color:var(--muted);font-size:20px;margin-top:40px}
 .svc{display:block;width:100%;margin:0 0 10px;padding:12px;border-radius:14px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:center;border:2px solid}
 .svc b{display:block;font-size:13px;margin-top:3px;opacity:.9}
@@ -446,7 +453,7 @@ function desdeRango(r){
   return d;
 }
 function listenPedidos(){
-  unsubPed && unsubPed(); unsubPed = null; pedidos = [];
+  unsubPed && unsubPed(); unsubPed = null; pedidos = []; pedLoaded = false;
   const id = ["cola","resumen","pantalla","bart"].includes(sel.view) ? sel.evento : null;
   if(!id) return;
   const q = id==="domicilio"
@@ -461,7 +468,7 @@ function listenPedidos(){
     if(sel.view==="bart"){ const prep = new Set(mine.filter(p=>p.estado==="preparando").map(p=>p.id)); if(knownPrep && [...prep].some(id=>!knownPrep.has(id)) && soundOn) ring("🍹 A preparar"); knownPrep = prep; }
     if(sel.view==="pantalla"){ const listos = new Set(mine.filter(p=>p.estado==="lista").map(p=>p.id)); if(knownListos && [...listos].some(id=>!knownListos.has(id)) && soundOn) ring("🔔 ¡Lista!"); knownListos = listos; }
     known = new Set(mine.map(p=>p.id));
-    pedidos = list; setLive(true); render();
+    pedidos = list; pedLoaded = true; setLive(true); render();
   }, ()=>setLive(false));
 }
 function setLive(ok){ const l=$("#live"); if(!l) return; l.textContent = ok?"En vivo":"Sin conexión"; l.className = "live "+(ok?"on":"off"); }
@@ -765,6 +772,7 @@ const servicioBtn = e => e.abierto===false
   ? `<button class="svc off" data-servicio="${e.id}" data-v="1">🔴 Barra cerrada · los invitados solo ven el menú<b>Toca para ABRIR el servicio</b></button>`
   : `<button class="svc on" data-servicio="${e.id}" data-v="0">🟢 Barra abierta · recibiendo pedidos<b>Toca para cerrar el servicio</b></button>`;
 // ===== Vista Bartender: solo lo que está en Preparar, número gigante y un botón ¡Lista! (como la pantalla de cocina de comida rápida) =====
+const PREP_TARDE = 10; // minutos de espera del cliente para considerar una bebida atrasada (cuadro Prep. en rojo)
 const ESPERA_MIN = 3; // minutos que un pedido nuevo puede esperar antes de prender la alerta roja
 const minDe = p => Math.max(0, Math.floor((Date.now() - (p.creado?.toMillis?.() || Date.now()))/60000));
 function bartView(){
@@ -780,8 +788,8 @@ function bartView(){
       <header><div class="btn0">${esc(p.numero)}</div><div class="btwho"><b>${esc(p.nombre)}</b><span class="crono ${c}">⏱ ${m} min</span></div></header>
       <ul>${(p.items||[]).map(it=>`<li><div class="nrow">${bebidaTag(it)}${it.tam||esSinAlc(p,it)?`<span class="tags">${it.tam?`<span class="tam">${esc(it.tam)}</span>`:""}${esSinAlc(p,it)?`<span class="sa0">🚫 Sin alcohol</span>`:""}</span>`:""}</div>
         ${saborDe(it)?`<div class="sab0">${emoDe(SEMO, saborDe(it))} ${esc(saborDe(it))}</div>`:""}
-        ${opsResto(it).length?`<div class="op">${opsResto(it).map(esc).join(" · ")}</div>`:""}
-        ${it.nota && !(esSinAlc(p,it) && /^\s*sin\s+alcohol\W*$/i.test(it.nota))?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
+        ${opsResto(it).map(o=>{ o = o.replace(/\s*\(\+\$[\d,]+\)/g,""); const k = o.indexOf(":"); return `<div class="btop">${k>0?`<span>${esc(o.slice(0,k))}:</span> ${esc(o.slice(k+1).trim())}`:esc(o)}</div>`; }).join("")}
+        ${it.nota && !(esSinAlc(p,it) && /^\s*sin\s+alcohol\W*$/i.test(it.nota))?`<div class="nota btnota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
       <button class="btlista" data-id="${p.id}" data-to="lista">✅ ¡Lista!</button></article>`; }).join("")}</div>`
       : `<p class="btempty">🙌 Nada por preparar.<br><small>Aquí aparecen las bebidas en cuanto el encargado las pase a Preparar.</small></p>`}`;
 }
@@ -790,6 +798,7 @@ function colaView(){
   const list0 = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
   const counts = Object.fromEntries(TABS.map(([k])=>[k, list0.filter(p=>p.estado===k).length]));
   let list = list0.filter(p=>p.estado===tab);
+  const atrasadas = list0.filter(p=>p.estado==="preparando" && minDe(p)>=PREP_TARDE).length; // prende rojo el cuadro de Prep.
   if(tab==="entregado" || tab==="cancelado") list = list.slice().reverse().slice(0,40);
   return `
     <div class="crumb"><button class="sec" data-home>← Eventos</button>
@@ -800,7 +809,7 @@ function colaView(){
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? servicioBtn(e) : ""}
     ${sel.evento!=="domicilio" ? invBanner(e) : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<a class="sec" href="index.html?e=${encodeURIComponent(sel.evento)}&b=${sel.barra||1}&staff=1" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;box-sizing:border-box;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular) · abre el menú</a>`:""}
-    <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
+    <nav class="tabs">${TABS.map(([k,n])=>`<button class="tab${k==="preparando" && atrasadas>0 ? " tarde" : ""}" data-tab="${k}" aria-pressed="${tab===k}">${n}<span>${counts[k]}</span></button>`).join("")}</nav>
     <div id="list">${list.length ? list.map(card).join("") : `<p class="empty">${tab==="nuevo"?"Sin pedidos nuevos. Aquí caen en cuanto un invitado pida.":"Nada por aquí."}</p>`}</div>`;
 }
 // ===== Precios por bebida y desglose =====
@@ -867,7 +876,9 @@ const opsResto = it => (it.opciones||[]).filter(o=>o!=="🚫 SIN ALCOHOL" && !/^
 const esSinAlc = (p,it) => (it.opciones||[]).includes("🚫 SIN ALCOHOL") || (p.modo==="evento" && it.marca==="fizz");
 function card(p){
   p_modoActual = p.modo;
-  return `<article class="ord ${p.modo}">
+  const tarde = sel.view==="cola" && p.estado==="preparando" && p.modo==="evento" ? minDe(p) : -1;
+  return `<article class="ord ${p.modo}${tarde>=PREP_TARDE?" tarde":""}">
+    ${tarde>=0?`<div class="crono2 ${tarde<5?"v":tarde<PREP_TARDE?"a":"r"}">⏱ ${tarde} min${tarde>=PREP_TARDE?" · ¡atrasada! ayuda a prepararla":""}</div>`:""}
     <header><div class="n">${esc(p.numero)}</div>
       <div class="who"><b>${esc(p.nombre)}</b>${vezBadge(p)}<small>${p.modo==="domicilio"?"🛵 Domicilio · ":(p.barra&&!sel.barra?`${bName(ev(p.evento),p.barra)} · `:"")}${ago(p.creado)}</small></div></header>
     <ul>${(p.items||[]).map(it=>`<li>${conPrecio(p)?`<span class="pz">${money(precioIt(it)*(it.cant||1))}${(it.cant||1)>1?`<small>${money(precioIt(it))} c/u</small>`:""}</span>`:""}<div class="nrow">${bebidaTag(it)}${it.tam||esSinAlc(p,it)?`<span class="tags">${it.tam?`<span class="tam">${esc(it.tam)}</span>`:""}${esSinAlc(p,it)?`<span class="sa0">🚫 Sin alcohol</span>`:""}</span>`:""}</div>
@@ -999,13 +1010,14 @@ function invStats(){
   vivos.forEach(p=>{ let k = invKey(p); if(nomDev[k]) k = nomDev[k]; cuenta[k] = (cuenta[k]||0)+1; vez[p.id] = cuenta[k]; });
   return {vez, cuenta, invitados: Object.keys(cuenta).length};
 }
-let invAviso = {};
+let invAviso = {}, pedLoaded = false;
 function invBanner(e){
   if(!e || !e.personas) return "";
   const {invitados} = invStats(), lim = +e.personas, extra = invitados - lim, pct = Math.min(100, invitados/lim*100);
-  const prev = invAviso[e.id];
-  if(prev!==undefined && invitados>prev && invitados>=lim && soundOn) ring(invitados===lim ? "✅ Invitados completos" : "⚠️ Invitado extra");
-  invAviso[e.id] = invitados;
+  // Solo compara cuando los pedidos ya cargaron (al cambiar de vista la lista arranca vacía y sonaba en falso)
+  if(pedLoaded){ const prev = invAviso[e.id];
+    if(prev!==undefined && invitados>prev && invitados>=lim && soundOn) ring(invitados===lim ? "✅ Invitados completos" : "⚠️ Invitado extra");
+    invAviso[e.id] = invitados; }
   const color = extra>0 ? "#e01b1b" : extra===0 ? "#ffb020" : "var(--neon)";
   return `<div style="margin:0 0 10px;padding:12px 14px;border-radius:14px;border:2px solid ${color};background:${extra>0?"rgba(224,27,27,.18)":"rgba(255,255,255,.04)"}${extra>0?";animation:invp 1.2s ease-in-out infinite":""}">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:15px">👥 Invitados atendidos</b><b style="font-size:24px;color:${color}">${invitados} / ${lim}</b></div>
@@ -1418,7 +1430,7 @@ document.addEventListener("click", async e=>{
   }
   else if(t.id==="outBtn") signOut(auth);
 });
-setInterval(()=>{ if(sel.view==="cola" && pedidos.length) render(); }, 60000);
+setInterval(()=>{ if(sel.view==="cola" && pedidos.length) render(); }, 30000);
 setInterval(()=>{ if(sel.view==="bart" && pedidos.length) render(); }, 20000); // cronómetros y alerta de espera
 
 </script>
