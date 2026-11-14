@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="63">
+<meta name="app-ver" content="64">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -138,6 +138,25 @@ body.tv .top{display:none}
 .mtog b{font-size:12.5px;padding:5px 10px;border-radius:999px;background:var(--neon);color:#1a0b3a;white-space:nowrap}
 .mi.off .mtog b{background:var(--pink);color:#fff}
 .mi.off .mtog span{opacity:.6;text-decoration:line-through}
+.bvbtn{display:block;width:100%;margin:0 0 10px;font-weight:800}
+body.bt .top h1,body.bt .top img,body.bt #outBtn{display:none}
+.bthead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+.bthead b{font-size:22px;display:block}.bthead small{color:var(--muted)}
+.btwait{border-radius:12px;padding:10px 12px;margin:0 0 12px;background:var(--panel);border:1.5px solid var(--line);font-size:14.5px;text-align:center}
+.btwait.rojo{background:#e01b1b;border-color:#fff;color:#fff;animation:btblink 1s steps(2) infinite}
+@keyframes btblink{50%{background:#7a0d0d}}
+.btlist{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.btc{background:var(--panel);border:1px solid var(--line);border-left:8px solid var(--neon);border-radius:16px;padding:14px}
+.btc header{display:flex;align-items:center;gap:12px}
+.btn0{font-family:var(--display);font-size:64px;line-height:1;color:var(--neon);font-variant-numeric:tabular-nums}
+.btwho b{display:block;font-size:18px}
+.crono{display:inline-block;margin-top:4px;font-weight:900;font-size:13px;padding:2px 8px;border-radius:999px}
+.crono.v{background:#1f9d4c;color:#fff}.crono.a{background:#ffd23f;color:#000}.crono.r{background:#e01b1b;color:#fff}
+.btc ul{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
+.btc li{background:var(--panel2);border-radius:10px;padding:10px}
+.btlista{all:unset;cursor:pointer;box-sizing:border-box;display:block;width:100%;margin-top:12px;text-align:center;font-weight:900;font-size:24px;padding:18px;border-radius:14px;background:var(--neon);color:#1a0b3a}
+.btlista[disabled]{opacity:.5}
+.btempty{text-align:center;color:var(--muted);font-size:20px;margin-top:40px}
 .svc{display:block;width:100%;margin:0 0 10px;padding:12px;border-radius:14px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:center;border:2px solid}
 .svc b{display:block;font-size:13px;margin-top:3px;opacity:.9}
 .svc.off{background:#3a0d12;border-color:#e01b1b;color:#ffb3b3}
@@ -376,7 +395,8 @@ let cupBorrar = null;
 const MOT_REEMB = ["No le gustó la bebida","Llegó maltratada / derramada","Bebida equivocada","Faltó una bebida","Llegó muy tarde"];
 let accion = null; // {id, tipo:"cancel"|"reemb"}
 
-function go(s){ knownListos = null; sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
+let knownPrep = null;
+function go(s){ knownListos = null; knownPrep = null; sel = s; store.set("nf_sel", JSON.stringify(s)); tab = "nuevo"; known = null; listenPedidos(); render(); scrollTo(0,0); }
 let cerrados = null;
 const FISICAS = 7; // número de barras físicas (cambia aquí si compras más)
 let asign = {}; // {"3": {e:"EVID", b:1}}
@@ -427,7 +447,7 @@ function desdeRango(r){
 }
 function listenPedidos(){
   unsubPed && unsubPed(); unsubPed = null; pedidos = [];
-  const id = ["cola","resumen","pantalla"].includes(sel.view) ? sel.evento : null;
+  const id = ["cola","resumen","pantalla","bart"].includes(sel.view) ? sel.evento : null;
   if(!id) return;
   const q = id==="domicilio"
     ? query(collection(db,"pedidos"), where("creado",">=",Timestamp.fromDate(desdeRango(domRango))))
@@ -438,6 +458,7 @@ function listenPedidos(){
     list.sort((a,b)=>(a.creado?.toMillis?.()||Date.now())-(b.creado?.toMillis?.()||Date.now()));
     const mine = list.filter(p=>!sel.barra || p.barra===sel.barra);
     if(known && sel.view==="cola"){ if(mine.some(p=>!known.has(p.id) && p.estado==="nuevo") && soundOn) ring("🔔 Pedido nuevo"); }
+    if(sel.view==="bart"){ const prep = new Set(mine.filter(p=>p.estado==="preparando").map(p=>p.id)); if(knownPrep && [...prep].some(id=>!knownPrep.has(id)) && soundOn) ring("🍹 A preparar"); knownPrep = prep; }
     if(sel.view==="pantalla"){ const listos = new Set(mine.filter(p=>p.estado==="lista").map(p=>p.id)); if(knownListos && [...listos].some(id=>!knownListos.has(id)) && soundOn) ring("🔔 ¡Lista!"); knownListos = listos; }
     known = new Set(mine.map(p=>p.id));
     pedidos = list; setLive(true); render();
@@ -449,10 +470,11 @@ function setLive(ok){ const l=$("#live"); if(!l) return; l.textContent = ok?"En 
 function render(){
   const v = sel.view;
   document.body.classList.toggle("tv", v==="pantalla");
-  if(["cola","qr","resumen","pantalla"].includes(v) && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
+  document.body.classList.toggle("bt", v==="bart");
+  if(["cola","qr","resumen","pantalla","bart"].includes(v) && sel.evento!=="domicilio" && eventosLoaded && !ev(sel.evento)) return go({view:"home"});
   const keep = {}; document.querySelectorAll("#main input, #main select").forEach(i=>{ if(i.id) keep[i.id] = i.type==="checkbox" ? {c:i.checked} : i.value; });
   const focused = document.activeElement?.id;
-  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : v==="fijos" ? fijosView() : v==="cupones" ? cuponesView() : v==="stats" ? statsView() : "";
+  $("#main").innerHTML = v==="home" ? homeView() : v==="cola" ? colaView() : v==="bart" ? bartView() : v==="qr" ? qrView() : v==="resumen" ? resumenView() : v==="pantalla" ? pantallaView() : v==="menu" ? menuView() : v==="horario" ? horarioView() : v==="historial" ? historialView() : v==="fijos" ? fijosView() : v==="cupones" ? cuponesView() : v==="stats" ? statsView() : "";
   if(freshForm){ freshForm = false; for(const k in keep) if(/^h/.test(k)) delete keep[k]; }
   Object.entries(keep).forEach(([id,val])=>{ const i=document.getElementById(id); if(!i) return; if(val && typeof val==="object") i.checked = val.c; else i.value = val; });
   if(focused){ const f=document.getElementById(focused); if(f && f.matches("input,select")) f.focus(); }
@@ -742,6 +764,27 @@ function horarioView(){
 const servicioBtn = e => e.abierto===false
   ? `<button class="svc off" data-servicio="${e.id}" data-v="1">🔴 Barra cerrada · los invitados solo ven el menú<b>Toca para ABRIR el servicio</b></button>`
   : `<button class="svc on" data-servicio="${e.id}" data-v="0">🟢 Barra abierta · recibiendo pedidos<b>Toca para cerrar el servicio</b></button>`;
+// ===== Vista Bartender: solo lo que está en Preparar, número gigante y un botón ¡Lista! (como la pantalla de cocina de comida rápida) =====
+const ESPERA_MIN = 3; // minutos que un pedido nuevo puede esperar antes de prender la alerta roja
+const minDe = p => Math.max(0, Math.floor((Date.now() - (p.creado?.toMillis?.() || Date.now()))/60000));
+function bartView(){
+  const e = ev(sel.evento);
+  const mine = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
+  const prep = mine.filter(p=>p.estado==="preparando");
+  const nuevos = mine.filter(p=>p.estado==="nuevo"), viejo = nuevos.length ? Math.max(...nuevos.map(minDe)) : 0;
+  const alerta = nuevos.length && viejo >= ESPERA_MIN;
+  return `<div class="bthead"><div><b>🍹 Bartender</b><small>${esc(e?.nombre||"")}${sel.barra?" · "+bName(e,sel.barra):""}</small></div>
+      <button class="sec" data-encargado>Cambiar a Encargado</button></div>
+    <div class="btwait${alerta?" rojo":""}">${nuevos.length ? `🕐 <b>${nuevos.length}</b> pedido${nuevos.length===1?"":"s"} nuevo${nuevos.length===1?"":"s"} esperando vaso · el más viejo hace ${viejo} min${alerta?"<br><b>¡El encargado se está atorando, échale la mano!</b>":""}` : "✅ Sin pedidos nuevos esperando"}</div>
+    ${prep.length ? `<div class="btlist">${prep.map(p=>{ p_modoActual = p.modo; const m = minDe(p), c = m<5?"v":m<10?"a":"r"; return `<article class="btc">
+      <header><div class="btn0">${esc(p.numero)}</div><div class="btwho"><b>${esc(p.nombre)}</b><span class="crono ${c}">⏱ ${m} min</span></div></header>
+      <ul>${(p.items||[]).map(it=>`<li><div class="nrow">${bebidaTag(it)}${it.tam||esSinAlc(p,it)?`<span class="tags">${it.tam?`<span class="tam">${esc(it.tam)}</span>`:""}${esSinAlc(p,it)?`<span class="sa0">🚫 Sin alcohol</span>`:""}</span>`:""}</div>
+        ${saborDe(it)?`<div class="sab0">${emoDe(SEMO, saborDe(it))} ${esc(saborDe(it))}</div>`:""}
+        ${opsResto(it).length?`<div class="op">${opsResto(it).map(esc).join(" · ")}</div>`:""}
+        ${it.nota && !(esSinAlc(p,it) && /^\s*sin\s+alcohol\W*$/i.test(it.nota))?`<div class="nota">📝 ${esc(it.nota)}</div>`:""}</li>`).join("")}</ul>
+      <button class="btlista" data-id="${p.id}" data-to="lista">✅ ¡Lista!</button></article>`; }).join("")}</div>`
+      : `<p class="btempty">🙌 Nada por preparar.<br><small>Aquí aparecen las bebidas en cuanto el encargado las pase a Preparar.</small></p>`}`;
+}
 function colaView(){
   const e = ev(sel.evento), titulo = sel.evento==="domicilio" ? "Domicilio" : (e?.nombre||"Evento");
   const list0 = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
@@ -753,6 +796,7 @@ function colaView(){
       <div><b>${esc(titulo)}</b>${sel.barra?`<span class="bdg">${bName(e,sel.barra)}</span>`:(e&&e.barras>1?`<span class="bdg">Todas</span>`:"")}</div></div>
     ${sel.evento==="domicilio"?`<div class="rangos">${RANGOS.map(([k,n])=>`<button class="rg" data-rango="${k}" aria-pressed="${domRango===k}">${n}</button>`).join("")}</div>`:""}
     ${sel.evento==="domicilio"?`<button class="sec" data-ventas style="width:100%;margin:0 0 10px">📋 Copiar ventas para el HTML de ventas <small style="opacity:.75">(${RANGOS.find(r=>r[0]===domRango)?.[1]||""})</small></button>`:""}
+    ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? `<button class="sec bvbtn" data-bart>🍹 Cambiar a vista Bartender</button>` : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? servicioBtn(e) : ""}
     ${sel.evento!=="domicilio" ? invBanner(e) : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<a class="sec" href="index.html?e=${encodeURIComponent(sel.evento)}&b=${sel.barra||1}&staff=1" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;box-sizing:border-box;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular) · abre el menú</a>`:""}
@@ -1335,6 +1379,8 @@ document.addEventListener("click", async e=>{
     e.marcas = l; e.marca = marcaVieja(l); render();
     try{ await updateDoc(doc(db,"eventos",e.id), {marcas:l, marca:e.marca}); }catch{ alert("No se pudo guardar. Revisa el internet."); } }
   else if(t.dataset.ag){ setAgotado(t.dataset.ag, sigEstado(agotados[t.dataset.ag])); }
+  else if(t.dataset.bart!==undefined){ go({view:"bart", evento:sel.evento, barra:sel.barra||0}); }
+  else if(t.dataset.encargado!==undefined){ go({view:"cola", evento:sel.evento, barra:sel.barra||0}); }
   else if(t.dataset.servicio){ const e = ev(t.dataset.servicio), ab = t.dataset.v==="1";
     if(!ab && !t.dataset.ok){ t.dataset.ok = "1"; t.querySelector("b").textContent = "¿Seguro? Toca otra vez para CERRAR"; setTimeout(()=>{ delete t.dataset.ok; if(t.isConnected) render(); }, 4000); return; }
     if(e) e.abierto = ab; render();
@@ -1373,6 +1419,7 @@ document.addEventListener("click", async e=>{
   else if(t.id==="outBtn") signOut(auth);
 });
 setInterval(()=>{ if(sel.view==="cola" && pedidos.length) render(); }, 60000);
+setInterval(()=>{ if(sel.view==="bart" && pedidos.length) render(); }, 20000); // cronómetros y alerta de espera
 
 </script>
 <script>
