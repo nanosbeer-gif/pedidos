@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="68">
+<meta name="app-ver" content="70">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -474,7 +474,7 @@ function listenPedidos(){
     if(sel.view==="bart"){ const prep = new Set(mine.filter(p=>p.estado==="preparando").map(p=>p.id)); if(knownPrep && [...prep].some(id=>!knownPrep.has(id)) && soundOn) ring("🍹 A preparar"); knownPrep = prep; }
     if(sel.view==="pantalla"){ const listos = new Set(mine.filter(p=>p.estado==="lista").map(p=>p.id)); if(knownListos && [...listos].some(id=>!knownListos.has(id)) && soundOn) ring("🔔 ¡Lista!"); knownListos = listos; }
     known = new Set(mine.map(p=>p.id));
-    pedidos = list; pedLoaded = true; setLive(true); render();
+    pedidos = list; pedLoaded = true; if(id!=="domicilio") trackLista(list); setLive(true); render();
   }, ()=>setLive(false));
 }
 function setLive(ok){ const l=$("#live"); if(!l) return; l.textContent = ok?"En vivo":"Sin conexión"; l.className = "live "+(ok?"on":"off"); }
@@ -948,9 +948,17 @@ function qrView(){
     <p class="hint">Hoja tamaño carta para imprimir y doblar en triángulo: de un lado el QR y del otro las instrucciones. Mantén presionada la imagen → <b>Guardar imagen</b>, imprímela en <b>cartulina carta al 100%</b>, recorta por la orilla, dobla en las líneas punteadas y pega la pestaña bajo la base.${e.barras>1?" Hay una por barra: pon en cada mesa la de la barra más cercana.":""}</p>
     <div class="tents">${Array.from({length:e.barras},(_,k)=>`<figure><canvas class="tentc" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}" data-nombre="Barra ${e.fisicas[k]}" data-marca="ambos"`:""} width="2550" height="3300" hidden></canvas><img class="tenti" data-b="${k+1}"${e.fisicas&&e.fisicas[k]?` data-url="${BASE}?f=${e.fisicas[k]}"`:""} alt="Tarjeta de mesa"><figcaption>${e.barras>1?"Tarjeta · "+bName(e,k+1):"Tarjeta de mesa"}</figcaption></figure>`).join("")}</div>`;
 }
-const TV_T1 = 10*60000, TV_T2 = 15*60000;
+const TV_T1 = 5*60000, TV_T2 = 10*60000; // 5 min sin recoger → amarillo oscuro · 10 min → rojo
 let tvLista = (()=>{ try{ return JSON.parse(localStorage.getItem("nf_tvlista")||"{}"); }catch{ return {}; } })();
 setInterval(()=>{ if(sel.view==="pantalla" && pedidos.some(p=>p.estado==="lista")) render(); }, 5000);
+// Anota la hora en que cada bebida pasa a ¡Lista!, en cualquier vista (pantalla, encargado o bartender)
+function trackLista(list){
+  const now = Date.now(); let cambio = false;
+  const listos = list.filter(p=>p.estado==="lista");
+  listos.forEach(p=>{ if(!tvLista[p.id]){ tvLista[p.id] = now; cambio = true; } });
+  for(const id in tvLista) if(!listos.some(p=>p.id===id)){ delete tvLista[id]; cambio = true; }
+  if(cambio) try{ localStorage.setItem("nf_tvlista", JSON.stringify(tvLista)); }catch{}
+}
 function pantallaView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
   const mine = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
@@ -958,11 +966,8 @@ function pantallaView(){
   const prep = mine.filter(p=>p.estado==="preparando" || p.estado==="nuevo");
   const tag = p => `<div class="tvn"><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`;
   // Cuánto lleva cada bebida en ¡Lista! (lo mide esta pantalla, que siempre está prendida)
-  const now = Date.now(); let cambio = false;
-  listos.forEach(p=>{ if(!tvLista[p.id]){ tvLista[p.id] = now; cambio = true; } });
-  if(pedLoaded) for(const id in tvLista) if(!listos.some(p=>p.id===id)){ delete tvLista[id]; cambio = true; }
-  if(cambio) try{ localStorage.setItem("nf_tvlista", JSON.stringify(tvLista)); }catch{}
-  // 10 min sin recoger: parpadea 3 veces en rojo y queda amarillo oscuro · 15 min: parpadea 3 veces y queda rojo
+  const now = Date.now();
+  // 5 min sin recoger: parpadea 3 veces en rojo y queda amarillo oscuro · 10 min: parpadea 3 veces y queda rojo
   const tagL = p => { const t = now - tvLista[p.id], st = t>=TV_T2 ? "t2" : t>=TV_T1 ? "t1" : "", d = t - (st==="t2"?TV_T2:TV_T1);
     return `<div class="tvn ${st}"${st?` style="animation-delay:-${d}ms"`:""}><b>${esc(p.numero)}</b><span>${esc(String(p.nombre).split(" ")[0])}</span></div>`; };
   return `<div class="tvwrap">
