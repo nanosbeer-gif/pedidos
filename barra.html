@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="72">
+<meta name="app-ver" content="75">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -15,7 +15,7 @@
 <title>Barra Nano's Fizz</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap">
 <script src="qrcode.js"></script>
-<script src="menu.js?v=41"></script>
+<script src="menu.js?v=42"></script>
 <style>
 [hidden]{display:none!important}
 /* Panel de barra: eventos arriba, cola de pedidos por estado; pensado para tablet o celular */
@@ -165,6 +165,17 @@ body.bt .top h1,body.bt .top img,body.bt #outBtn{display:none}
 .asgm{all:unset;cursor:pointer;font-size:13px;font-weight:700;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .asgm[aria-pressed="true"]{background:var(--neon);color:#1a0b3a;border-color:var(--neon)}
 .asgbts{display:grid;gap:6px}
+.tph{font-size:15px;margin:16px 0 6px}.tph small{color:var(--muted);font-weight:600}
+.tpl{display:grid;gap:6px}
+.tpr{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;flex-wrap:wrap}
+.tpn{font-weight:800;min-width:110px;flex:1}
+.tpbar{flex:2;min-width:80px;height:10px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.tpbar i{display:block;height:100%;background:var(--neon);border-radius:99px}
+.tpbar.cnt i{background:var(--pink)}
+.tpr b{font-size:17px;font-variant-numeric:tabular-nums}.tpr small{color:var(--muted);font-size:12px}
+.tvprom{text-align:center;font-weight:800;font-size:clamp(14px,3.5vw,22px);margin:8px 0;color:var(--neon)}
+.asgdesc{font-size:13px;color:var(--muted);margin:0 0 8px;line-height:1.35}
+.asgb span i{font-style:normal;display:inline-block;font-size:12.5px;padding:2px 7px;border-radius:999px;background:var(--panel);margin:2px 2px 0 0}
 .asgb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel2);border-radius:10px;padding:6px 8px}
 .asgb b{font-size:16px}.asgb span{font-weight:800;flex:1}.asgb.pausa{opacity:.6}
 .mini{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;padding:4px 8px;border-radius:8px;border:1px solid var(--line);color:var(--muted)}
@@ -554,10 +565,11 @@ function homeView(){
       <h2>Eventos cerrados</h2>
       ${cerrados===null ? `<button class="sec" data-vercerr>📁 Ver eventos cerrados</button>`
         : cerrados.length ? cerrados.map(e=>`<article class="evc cerr">
-            <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.barras} ${e.barras>1?"barras":"barra"} · Cerrado</small></div>
+            <div class="evh"><b>${esc(e.nombre)}</b><small>${fecha(e.creado)} · ${e.personas} personas · ${e.barras} ${e.barras>1?"barras":"barra"} · Cerrado${prepStats(e).n?` · ⏱ prom ${fmtT(prepStats(e).avg)}`:""}</small></div>
             <div class="evb"><button class="sec" data-res="${e.id}">Resumen</button><button class="sec" data-reabrir="${e.id}">Reabrir evento</button></div>
           </article>`).join("") : `<p class="empty">No hay eventos cerrados.</p>`}
     </section>
+    ${compararEventosHTML()}
     <section class="blk">
       <h2>Crear evento</h2>
       <form id="evForm" class="evf">
@@ -812,14 +824,20 @@ const servicioBtn = e => e.abierto===false
   : `<button class="svc on" data-servicio="${e.id}" data-v="0">🟢 Barra abierta · recibiendo pedidos<b>Toca para cerrar el servicio</b></button>`;
 // ===== Asignación de bebidas por bartender =====
 // Se guarda en el evento: barts:{id:{n:nombre, est:[estaciones], pausa, b:barra, ult}}, asig:{pedidoId:bartenderId}, modoAsig
-const FAM = {lic:{e:"🌀",n:"Licuadora"}, cer:{e:"🍺",n:"Cerveza"}, vas:{e:"🥤",n:"Vaso armado"}};
+const FAM = {lic:{e:"🍹",n:"Licuadora"}, cer:{e:"🍺",n:"Cerveza"}, vas:{e:"🥤",n:"Vaso armado"}};
+const MODO_TXT = {
+  inteligente: "Junta bebidas del mismo tipo en el mismo bartender (hasta 3), para que las haga en tanda. Si nadie las tiene, se la da al menos ocupado.",
+  parejo: "Reparte parejo: cada bebida se va al bartender que tenga menos en ese momento, sin importar el tipo.",
+  estacion: "Cada bartender recibe solo lo de su estación (licuadora, cerveza o vaso armado), según lo que marcó al entrar.",
+  manual: "Tú decides: en cada pedido nuevo te salen botones con el nombre de cada bartender y cuántas lleva."
+};
 const MODOS = [["inteligente","🧠 Inteligente"],["parejo","⚖️ Parejo"],["estacion","🏪 Estación"],["manual","✋ Manual"]];
 let famCache = null;
 function famIt(it){
   if(!famCache){ famCache = {}; NFM.ITEMS.forEach(i=>{ const n = normB(i.name);
     const f = /frapp|matcha|pina colada|mangonada|^ice$|smoothie|taro|licuad|bubble|tapioca|malteada|chamoyada/.test(n) ? "lic" : (i.marca==="beer" || i.cat==="nb_cerv") ? "cer" : "vas";
     famCache[i.marca+"|"+n] = f; if(!famCache["*|"+n]) famCache["*|"+n] = f; }); }
-  const n = normB(it&&it.nombre); return famCache[(it&&it.marca||"")+"|"+n] || famCache["*|"+n] || "vas";
+  const n = normB(it&&it.nombre); return famCache[(it&&it.marca||"")+"|"+n] || famCache["*|"+n] || (/frapp|matcha|pina colada|mangonada|smoothie|licuad|malteada/.test(n) ? "lic" : it && it.marca==="beer" ? "cer" : "vas");
 }
 const famPed = p => famIt((p.items||[])[0]);
 const MY_BID = (()=>{ const nuevo = ()=>"b"+Math.random().toString(36).slice(2,9); try{ let b = localStorage.getItem("nb_bid"); if(!b){ b = nuevo(); localStorage.setItem("nb_bid", b); } return b; }catch{ return nuevo(); } })();
@@ -857,8 +875,9 @@ function asigBar(e){ // barrita del encargado: modo + carga de cada bartender
   if(!bs.length) return `<p class="hint asghint">🍹 Cuando cada bartender entre a su vista y ponga su nombre, aquí verás cuántas bebidas lleva y la app se las repartirá sola.</p>`;
   const c = cargas(e, sel.barra);
   return `<div class="asgbar"><div class="asgmodos">${MODOS.map(([k,n])=>`<button class="asgm" data-modo="${k}" aria-pressed="${modo===k}">${n}</button>`).join("")}</div>
+    <p class="asgdesc">${MODO_TXT[modo]}</p>
     <div class="asgbts">${bs.map(b=>`<div class="asgb${b.pausa?" pausa":""}"><b>${esc(b.n)}</b>
-      <span>${b.pausa ? "⏸ en pausa" : `${FAM.lic.e}${c[b.id].lic} ${FAM.cer.e}${c[b.id].cer} ${FAM.vas.e}${c[b.id].vas}`}</span>
+      <span>${b.pausa ? "⏸ en pausa" : `<i>Licuadora ${c[b.id].lic}</i> <i>Cerveza ${c[b.id].cer}</i> <i>Vaso ${c[b.id].vas}</i>`}</span>
       <button class="mini" data-bpausa="${b.id}">${b.pausa?"▶️ Activar":"⏸ Pausa"}</button>
       <button class="mini" data-bquita="${b.id}">${quitarBid===b.id?"¿Quitar? Toca otra vez":"✕"}</button></div>`).join("")}</div></div>`;
 }
@@ -903,7 +922,7 @@ function bartView(){
     ${yo?.pausa?`<div class="btwait rojo" style="animation:none">⏸ Estás en pausa: no te llegan bebidas nuevas.</div>`:""}
     ${otros.length?`<p class="btotros">${otros.map(b=>`${esc(b.n)}: ${b.pausa?"⏸":`<b>${c[b.id].tot}</b>`}`).join(" · ")}</p>`:""}
     <div class="btwait${alerta?" rojo":""}">${nuevos.length ? `🕐 <b>${nuevos.length}</b> pedido${nuevos.length===1?"":"s"} nuevo${nuevos.length===1?"":"s"} esperando vaso · el más viejo hace ${viejo} min${alerta?"<br><b>¡El encargado se está atorando, échale la mano!</b>":""}` : "✅ Sin pedidos nuevos esperando"}</div>
-    ${prep.length ? `<div class="btlist">${prep.map(p=>{ p_modoActual = p.modo; const m = minDe(p), c = m<5?"v":m<10?"a":"r"; return `<article class="btc${asigDe(e,p.id)?"":" libre"}">
+    ${prep.length ? `<div class="btlist">${prep.map(p=>{ p_modoActual = p.modo; const t0 = e && e.prepT && e.prepT[p.id], m = t0 ? Math.floor((Date.now()-t0)/60000) : minDe(p), c = m<3?"v":m<6?"a":"r"; return `<article class="btc${asigDe(e,p.id)?"":" libre"}">
       ${asigDe(e,p.id)?"":`<div class="btlibre">Sin asignar · cualquiera puede hacerla</div>`}
       <header><div class="btn0">${esc(p.numero)}</div><div class="btwho"><b>${esc(p.nombre)}</b><span class="crono ${c}">⏱ ${m} min</span></div></header>
       <ul>${(p.items||[]).map(it=>`<li><div class="nrow">${bebidaTag(it)}${it.tam||esSinAlc(p,it)?`<span class="tags">${it.tam?`<span class="tam">${esc(it.tam)}</span>`:""}${esSinAlc(p,it)?`<span class="sa0">🚫 Sin alcohol</span>`:""}</span>`:""}</div>
@@ -970,7 +989,7 @@ function ligaHTML(p){
 // [patrón del nombre, fondo, letra opcional]. Si no se da letra, se calcula el contraste (clara → negra, oscura → blanca).
 // Emoji por bebida y por sabor, para reconocerla de un vistazo
 const BEMO = [[/frutos rojos/,"🍓"],[/pitufina/,"❤️"],[/pitufo/,"💙"],[/barbie/,"💖"],[/linterna/,"💚"],[/sangr|clericot/,"🍷"],[/mojito/,"🌿"],[/^ice$/,"🧊"],[/mangonada/,"🥭"],[/soda/,"🥤"],[/frapp/,"☕"],[/bubble|tapioca/,"🧋"],[/pina colada/,"🍍"],[/clamato/,"🍅"],[/tradicional|sola|special|cerveza/,"🍺"],[/caribe/,"🏝️"],[/cuba|quemadita/,"🥃"],[/bubbaloo/,"🍬"],[/paloma/,"🍹"],[/sunrise/,"🌅"],[/medias/,"🩷"],[/gin/,"🍸"],[/mezcalita/,"🌺"],[/margarita/,"🍸"],[/cantarito/,"🏺"],[/papas/,"🍟"]];
-const SEMO = [[/cereza/,"🍒"],[/mora/,"🫐"],[/frutos rojos/,"🍓"],[/fresa/,"🍓"],[/manzana/,"🍏"],[/mango/,"🥭"],[/maracuya/,"💛"],[/sandia/,"🍉"],[/limon/,"🍋"],[/glitter/,"✨"],[/caramelo/,"🍯"],[/chocolate/,"🍫"],[/taro/,"🟣"],[/matcha/,"🍵"]];
+const SEMO = [[/cereza/,"🍒"],[/mora/,"🫐"],[/frutos rojos/,"🍓"],[/fresa/,"🍓"],[/manzana/,"🍏"],[/mango/,"🥭"],[/maracuya/,"💛"],[/sandia/,"🍉"],[/limon/,"🍋"],[/glitter/,"✨"],[/caramelo/,"🍯"],[/jamaica/,"🌺"],[/chocolate/,"🍫"],[/taro/,"🟣"],[/matcha/,"🍵"]];
 const emoDe = (lista, s) => { const n = normB(s), x = lista.find(e=>e[0].test(n)); return x ? x[1] : ""; };
 const BCOL = [
   [/frutos rojos/,"#d6245a"], [/pitufina/,"#c8102e"], [/pitufo/,"#1a5cff"], [/barbie/,"#ff3fa4"], [/linterna/,"#22b14c"],
@@ -1097,10 +1116,55 @@ function pantallaView(){
       <button class="sec tvx" data-salirtv>Salir</button></header>
     <div class="tvcols">
       <section class="tvlist"><h2>🥤 ¡Listas! Pasa por tu bebida</h2><div class="tvgrid big">${listos.length?listos.map(tagL).join(""):`<p class="tvempty">Aquí aparecen los números listos</p>`}</div></section>
+      ${prepStats(e).n>=5?`<p class="tvprom">⏱ Hoy preparamos cada bebida en promedio en <b>${fmtT(prepStats(e).avg)}</b> min</p>`:""}
       <section class="tvprep"><h2>Preparando</h2><div class="tvgrid">${prep.length?prep.map(tag).join(""):`<p class="tvempty">—</p>`}</div></section>
     </div>
     <p class="tvfoot">Escanea el QR, pide tu bebida y espera tu número aquí</p>
   </div>`;
+}
+// ===== Tiempos de preparación (desde "Preparar" hasta "¡Lista!") =====
+// Se guardan en el evento: prepT:{pedidoId: hora en que se mandó a preparar}, prep:{pedidoId:{d:duración ms, b:bartenderId, bn:nombre, beb:bebida, f:estación, t:hora}}
+const fmtT = ms => { const s = Math.max(0, Math.round(ms/1000)), m = Math.floor(s/60); return m+":"+String(s%60).padStart(2,"0"); };
+const prepRecs = e => Object.values((e && e.prep) || {}).filter(r=>r && typeof r.d==="number" && r.d>=5000 && r.d<=3600000); // fuera toques por error y olvidadas
+function agrupa(recs, key){
+  const g = {}; recs.forEach(r=>{ const k = key(r); if(!k) return; const x = g[k] || (g[k] = {k, n:0, sum:0, min:Infinity}); x.n++; x.sum += r.d; x.min = Math.min(x.min, r.d); });
+  return Object.values(g).map(x=>({...x, avg: x.sum/x.n}));
+}
+function prepStats(e){
+  const recs = prepRecs(e), n = recs.length, sum = recs.reduce((a,r)=>a+r.d,0);
+  const todos = Object.values((e && e.prep) || {}); // para contar bebidas por bartender aunque el tiempo no sea válido
+  const cuenta = {}; todos.forEach(r=>{ if(r && r.bn) cuenta[r.bn] = (cuenta[r.bn]||0) + 1; });
+  return { n, avg: n ? sum/n : 0, min: n ? Math.min(...recs.map(r=>r.d)) : 0,
+    bart: agrupa(recs, r=>r.bn).map(x=>({...x, total: cuenta[x.k]||x.n})), cuenta,
+    beb: agrupa(recs, r=>r.beb), est: agrupa(recs, r=>r.f) };
+}
+const MEDALLA = ["🥇","🥈","🥉"];
+function tiemposHTML(e){
+  const st = prepStats(e);
+  if(!st.n) return `<h2>⏱ Tiempos de preparación</h2><p class="empty">Aún no hay tiempos medidos. Se miden desde que el encargado toca "Preparar" hasta que tocan "¡Lista!".</p>`;
+  const rapidos = st.bart.filter(b=>b.n>=3).sort((a,b)=>a.avg-b.avg), maxAvg = Math.max(...st.bart.map(b=>b.avg));
+  const masBeb = Object.entries(st.cuenta).sort((a,b)=>b[1]-a[1]), maxBeb = masBeb.length ? masBeb[0][1] : 1;
+  return `<h2>⏱ Tiempos de preparación</h2>
+    <div class="kpis"><div><span>${fmtT(st.avg)}</span>Promedio por bebida</div><div><span>${fmtT(st.min)}</span>La más rápida</div><div><span>${st.n}</span>Bebidas medidas</div></div>
+    <h3 class="tph">🏆 Los más rápidos <small>(mínimo 3 bebidas)</small></h3>
+    <div class="tpl">${rapidos.length ? rapidos.map((b,i)=>`<div class="tpr"><span class="tpn">${MEDALLA[i]||(i+1)+"."} ${esc(b.k)}</span><span class="tpbar"><i style="width:${Math.round(b.avg/maxAvg*100)}%"></i></span><b>${fmtT(b.avg)}</b><small>mejor ${fmtT(b.min)}</small></div>`).join("") : `<p class="hint">Todavía nadie lleva 3 bebidas medidas.</p>`}</div>
+    <h3 class="tph">🍹 Bebidas preparadas por bartender</h3>
+    <div class="tpl">${masBeb.length ? masBeb.map(([n,c],i)=>`<div class="tpr"><span class="tpn">${MEDALLA[i]||(i+1)+"."} ${esc(n)}</span><span class="tpbar cnt"><i style="width:${Math.round(c/maxBeb*100)}%"></i></span><b>${c}</b><small>bebidas</small></div>`).join("") : `<p class="hint">Sin bartenders registrados.</p>`}</div>
+    <h3 class="tph">Por estación</h3>
+    <div class="tpl">${st.est.sort((a,b)=>b.n-a.n).map(x=>`<div class="tpr"><span class="tpn">${FAM[x.k]?FAM[x.k].n:x.k}</span><b>${fmtT(x.avg)}</b><small>${x.n} bebidas</small></div>`).join("")}</div>
+    <h3 class="tph">Por bebida</h3>
+    <div class="tpl">${st.beb.sort((a,b)=>b.n-a.n).map(x=>`<div class="tpr"><span class="tpn">${esc(x.k)}</span><b>${fmtT(x.avg)}</b><small>${x.n} ${x.n===1?"bebida":"bebidas"}</small></div>`).join("")}</div>`;
+}
+function compararEventosHTML(){ // todos los eventos cargados con tiempos medidos + ranking general de bartenders
+  const evs = [...eventos, ...(cerrados||[])].filter((e,i,a)=>a.findIndex(x=>x.id===e.id)===i).map(e=>({e, st: prepStats(e)})).filter(x=>x.st.n);
+  if(!evs.length) return "";
+  const glob = {}; evs.forEach(({e})=>prepRecs(e).forEach(r=>{ if(!r.bn) return; const g = glob[r.bn] || (glob[r.bn] = {n:0, sum:0, evs:new Set()}); g.n++; g.sum += r.d; g.evs.add(e.id); }));
+  const rank = Object.entries(glob).map(([k,g])=>({k, n:g.n, avg:g.sum/g.n, ev:g.evs.size})).sort((a,b)=>b.n-a.n);
+  return `<section class="blk"><h2>📊 Tiempos por evento</h2>
+    <div class="tpl">${evs.sort((a,b)=>a.st.avg-b.st.avg).map(({e,st})=>`<div class="tpr"><span class="tpn">${esc(e.nombre)}</span><b>${fmtT(st.avg)}</b><small>${st.n} bebidas · ${fecha(e.creado)}</small></div>`).join("")}</div>
+    <h3 class="tph">🏆 Bartenders en todos los eventos</h3>
+    <div class="tpl">${rank.map((b,i)=>`<div class="tpr"><span class="tpn">${MEDALLA[i]||(i+1)+"."} ${esc(b.k)}</span><b>${b.n}</b><small>bebidas · prom ${fmtT(b.avg)} · ${b.ev} ${b.ev===1?"evento":"eventos"}</small></div>`).join("")}</div>
+    ${cerrados===null?`<p class="hint">Toca "Ver eventos cerrados" para sumar los eventos anteriores.</p>`:""}</section>`;
 }
 function resumenView(){
   const e = ev(sel.evento); if(!e) return `<p class="empty">Evento no encontrado.</p>`;
@@ -1122,6 +1186,7 @@ function resumenView(){
     ${e.barras>1?`<h2>Por barra</h2><div class="bars">${porB.map((n,k)=>`<div>${bName(e,k+1)}<b>${n}</b></div>`).join("")}</div>`:""}
     <h2>Más pedidas</h2>
     <div class="top">${topList.length?topList.map(([n,c])=>`<div><span>${esc(n)}</span><b>${c}</b></div>`).join(""):`<p class="empty">Aún no hay pedidos_.</p>`}</div>
+    ${tiemposHTML(e)}
     <div class="blk"><button class="sec" data-dash="${e.id}">📋 Copiar para dashboard</button></div>
     <div class="blk">
       ${cerrando===e.id
@@ -1592,11 +1657,26 @@ document.addEventListener("click", async e=>{
     t.disabled = true;
     const p = pedidos.find(x=>x.id===t.dataset.id), e = p && p.modo==="evento" ? ev(p.evento) : null;
     try{
+      const ahora = Date.now(), antes = p && p.estado;
       await updateDoc(doc(db,"pedidos",t.dataset.id), {estado:t.dataset.to});
+      if(e){ // tiempos de preparación
+        const upd = {};
+        if(t.dataset.to==="preparando"){ upd["prepT."+p.id] = ahora; e.prepT = {...(e.prepT||{}), [p.id]: ahora}; }
+        else {
+          if(antes==="preparando" && t.dataset.to==="lista"){
+            const t0 = e.prepT && e.prepT[p.id], bid = asigDe(e, p.id) || (sel.view==="bart" && e.barts && e.barts[MY_BID] ? MY_BID : null);
+            const rec = {d: t0 ? ahora - t0 : null, b: bid, bn: bid ? e.barts[bid].n : null, beb: ((p.items||[])[0]||{}).nombre || "", f: famPed(p), t: ahora};
+            upd["prep."+p.id] = rec; e.prep = {...(e.prep||{}), [p.id]: rec};
+          }
+          if(e.prepT && e.prepT[p.id]) upd["prepT."+p.id] = deleteField();
+          if(e.asig && e.asig[p.id]){ upd["asig."+p.id] = deleteField(); const a = {...e.asig}; delete a[p.id]; e.asig = a; }
+        }
+        if(Object.keys(upd).length) updateDoc(doc(db,"eventos",e.id), upd).catch(()=>{});
+      }
       if(e && t.dataset.to==="preparando" && bartsBarra(e, p.barra).length){
         const bid = t.dataset.bid || elegirBart(e, p);
         if(bid){ await asignar(e, p.id, bid); if(sel.view==="cola") flashAsig(e.barts[bid].n); }
-      } else if(e && t.dataset.to!=="preparando" && e.asig && e.asig[p.id]) asignar(e, p.id, null);
+      }
     }
     catch{ t.disabled = false; }
   }
