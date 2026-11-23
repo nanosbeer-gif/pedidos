@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="66">
+<meta name="app-ver" content="68">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -221,6 +221,8 @@ body[data-marca="bar"] .card{border-color:#c9a22755}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, getDoc, getDocFromServer, updateDoc, setDoc, increment, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// Todo el arranque va dentro de una función async: así funciona también en iPads/iPhones con iOS 14 (no soportan "await" suelto)
+(async function main(){
 
 const firebaseConfig = {
   apiKey: "AIzaSyDP3ZypMhSahfx-e1KEsSh6rsy4IIJakiU",
@@ -481,7 +483,7 @@ function closeSheet(){ $("#sheetBg").hidden = true; }
 
 function openItem(id){
   if(mode==="evento" && !eventoOk) return closedSheet();
-  const xtra = mode==="evento" && ITEMS.find(x=>x.id===id)?.extraEvento;
+  const xtra = mode==="evento" && (ITEMS.find(x=>x.id===id)||{}).extraEvento;
   if(mode==="evento" && !xtra && activeEvento()){ activeEventoFresco().then(a=>{ if(a) lockSheet(a); else openItem(id); }); return; }
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
   const i = ITEMS.find(x=>x.id===id);
@@ -508,12 +510,12 @@ function openItem(id){
 function addItem(id){
   stat("carrito");
   const i = ITEMS.find(x=>x.id===id);
-  const big = document.querySelector('input[name="size"]:checked')?.value==="1";
-  const sinAlc = !!(i.sinAlcohol && mode==="evento" && $("#sinAlc")?.checked);
-  const choices = (sinAlc ? ["🚫 SIN ALCOHOL"] : []).concat(i.groups.map((gr,gi)=>!document.querySelector(`input[name="g${gi}"]`) ? null : gr.multi ? (gr.name.replace(/^¿Qué ingredientes deseas en tus papas\?$/,"Ingredientes")+": "+([...document.querySelectorAll(`input[name="g${gi}"]:checked`)].map(c=>c.value).join(", ")||"sin ingredientes extra")) : gr.name+": "+(document.querySelector(`input[name="g${gi}"]:checked`)?.value||"—")).filter(Boolean));
+  const big = (document.querySelector('input[name="size"]:checked')||{}).value==="1";
+  const sinAlc = !!(i.sinAlcohol && mode==="evento" && ($("#sinAlc")||{}).checked);
+  const choices = (sinAlc ? ["🚫 SIN ALCOHOL"] : []).concat(i.groups.map((gr,gi)=>!document.querySelector(`input[name="g${gi}"]`) ? null : gr.multi ? (gr.name.replace(/^¿Qué ingredientes deseas en tus papas\?$/,"Ingredientes")+": "+([...document.querySelectorAll(`input[name="g${gi}"]:checked`)].map(c=>c.value).join(", ")||"sin ingredientes extra")) : gr.name+": "+((document.querySelector(`input[name="g${gi}"]:checked`)||{}).value||"—")).filter(Boolean));
   const ex = mode==="domicilio" ? [...document.querySelectorAll('input[name="ex"]:checked')].map(x=>(EXTRAS[i.id]||[])[+x.value]).filter(Boolean) : [];
   ex.forEach(x=>choices.push(x.n+" (+"+money(x.p)+")"));
-  const line = {marca:i.marca,name:i.name,size:i.noSize?"":(big?"1 L":"½ L"),unit:mode==="evento"?(i.extraEvento||0):(i.price||0)+(big&&!i.noSize?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+($("#q")?.textContent||1)),choices,note:$("#itemNote").value.trim()};
+  const line = {marca:i.marca,name:i.name,size:i.noSize?"":(big?"1 L":"½ L"),unit:mode==="evento"?(i.extraEvento||0):(i.price||0)+(big&&!i.noSize?EXTRA_LITRO:0)+ex.reduce((a,x)=>a+x.p,0),qty:mode==="evento"?1:Math.min(10,+(($("#q")||{}).textContent||1)),choices,note:$("#itemNote").value.trim()};
   if(mode==="evento"){ cart = [line]; renderCart(); openCart(); return; }
   cart.push(line); renderCart(); upsell(line);
 }
@@ -681,7 +683,7 @@ async function send(){
     const a = await activeEventoFresco(); if(a) return lockSheet(a);
   }
   if(mode==="domicilio" && !tiendaAbierta().abierta) return cerradoSheet();
-  const v = id => ($("#"+id)?.value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
+  const v = id => (($("#"+id)||{}).value||"").trim(), box = $("#msg"), btn = $("#sendBtn");
   if(pideBebida() && $("#vasoOk") && !$("#vasoOk").checked){
     box.innerHTML = `<p class="err">Marca la casilla del vaso para enviar tu pedido 🥤</p>`; $("#vasoOk").closest(".vaso").scrollIntoView({block:"center"}); return;
   }
@@ -689,10 +691,10 @@ async function send(){
   if(!v("nombre") || (mode==="domicilio" && (!v("lugar") || !v("tel")))){
     box.innerHTML = `<p class="err">${mode==="evento"?"Escribe tu nombre para enviar.":"Completa tu nombre, teléfono y dirección para enviar."}</p>`; return;
   }
-  if(mode==="domicilio" && conAlcohol() && document.querySelector('input[name="pago"]:checked')?.value==="Efectivo"){
+  if(mode==="domicilio" && conAlcohol() && (document.querySelector('input[name="pago"]:checked')||{}).value==="Efectivo"){
     box.innerHTML = `<p class="err">Los pedidos con alcohol se pagan con transferencia o tarjeta.</p>`; return;
   }
-  if(mode==="domicilio" && document.querySelector('input[name="pago"]:checked')?.value==="Transferencia" && !compData){
+  if(mode==="domicilio" && (document.querySelector('input[name="pago"]:checked')||{}).value==="Transferencia" && !compData){
     box.innerHTML = `<p class="err">Sube la foto de tu comprobante de transferencia para enviar el pedido.</p>`; return;
   }
   btn.disabled = true; btn.textContent = "Enviando…";
@@ -704,10 +706,10 @@ async function send(){
     items: cart.map(l=>({nombre:l.name, tam:l.size, cant:l.qty, opciones:l.choices, nota:l.note, precio:l.unit||0, marca:l.marca||""})),
     total: mode==="domicilio"?totalFinal():cart.reduce((a,l)=>a+(l.unit||0)*l.qty,0),
     cupon: mode==="domicilio" && cuponDe(cuponAplicado) ? cuponAplicado : "",
-    descuento: mode==="domicilio" ? descuento() + (cuponDe(cuponAplicado)?.tipo==="envio" ? envioBase() : 0) : 0,
+    descuento: mode==="domicilio" ? descuento() + ((cuponDe(cuponAplicado)||{}).tipo==="envio" ? envioBase() : 0) : 0,
     evento: E || "domicilio", barra: E ? BARRA : 0,
     ubicacion: mode==="domicilio" && ubic ? ubic : null,
-    comprobante: mode==="domicilio" && document.querySelector('input[name="pago"]:checked')?.value==="Transferencia" ? compData : "",
+    comprobante: mode==="domicilio" && (document.querySelector('input[name="pago"]:checked')||{}).value==="Transferencia" ? compData : "",
     estado: "nuevo", creado: serverTimestamp()
   };
   try{
@@ -903,13 +905,13 @@ document.addEventListener("click", e=>{
   else if(t.id==="openCart" || t.id==="openCart2") openCart();
   else if(t.id==="geoBtn") askLocation(t);
   else if(t.dataset.cupok!==undefined){
-    const code = ($("#cupIn")?.value||"").trim().toUpperCase();
+    const code = (($("#cupIn")||{}).value||"").trim().toUpperCase();
     if(cuponDe(code)){ cuponAplicado = code; store.set("nf_cupon", code); cuponMsg = ""; setModeUI(); renderMenu(); }
     else cuponMsg = code ? "Ese código no es válido o ya no está activo." : "Escribe tu código.";
     renderCart(); openCart();
   }
   else if(t.dataset.cupoff!==undefined){ cuponAplicado = ""; store.del("nf_cupon"); cuponMsg = ""; setModeUI(); renderMenu(); renderCart(); openCart(); }
-  else if(t.dataset.copy){ const v = t.dataset.copy; (navigator.clipboard?.writeText(v) || Promise.reject()).then(()=>{ t.textContent = "Copiada ✓"; }).catch(()=>{ t.textContent = "Mantén presionado el número para copiar"; }); }
+  else if(t.dataset.copy){ const v = t.dataset.copy; ((navigator.clipboard && navigator.clipboard.writeText(v)) || Promise.reject()).then(()=>{ t.textContent = "Copiada ✓"; }).catch(()=>{ t.textContent = "Mantén presionado el número para copiar"; }); }
   else if(t.id==="sendBtn") send();
 });
 document.addEventListener("input", e=>{ const k = {nombre:"nf_nombre",tel:"nf_tel",lugar:"nf_dir",ref:"nf_ref"}[e.target.id]; if(k) store.set(k, e.target.value); });
@@ -937,9 +939,11 @@ document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState=
 setModeUI(); renderBrand(); renderChips(); renderMenu(); renderCart(); loadEvento(); listenConfig(); stat("visita");
 if("serviceWorker" in navigator && !E) navigator.serviceWorker.register("sw.js").catch(()=>{});
 loadMine(); mine.forEach(m=>track(m.id));
-autoOpen = mine[0]?.id || null;
+autoOpen = (mine[0]||{}).id || null;
 
 window.__appOk = true;
+
+})();
 </script>
 <script>
 /* Auto-actualización: si en GitHub hay una versión nueva, la página se recarga sola (sin interrumpir un pedido en curso) */
