@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="65">
+<meta name="app-ver" content="66">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -202,6 +202,22 @@ body[data-marca="bar"] .card{border-color:#c9a22755}
 <div class="sheetbg" id="sheetBg" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
 
 <script src="menu.js?v=42"></script>
+<script>
+// Diagnóstico: si la app no arranca en un dispositivo (ej. iPad viejito), muestra el error en pantalla
+(function(){
+  var errs = [];
+  function caja(){
+    var d = document.getElementById("diagBox");
+    if(!d){ d = document.createElement("div"); d.id = "diagBox";
+      d.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#fff;color:#000;font:13px/1.35 -apple-system,sans-serif;padding:10px 12px;border-radius:10px;border:3px solid #e01b1b;max-height:45vh;overflow:auto";
+      (document.body || document.documentElement).appendChild(d); }
+    d.innerHTML = "<b>La app no cargó bien en este dispositivo.</b><br>Mándale foto de este cuadro a soporte:<br><br>" + errs.join("<br>") + "<br><br><small>" + navigator.userAgent + "</small>";
+  }
+  window.addEventListener("error", function(e){ errs.push("Error: " + (e.message || (e.target && (e.target.src || e.target.href)) || "desconocido") + (e.lineno ? " (línea " + e.lineno + ")" : "")); if(window.__appOk) return; caja(); }, true);
+  window.addEventListener("unhandledrejection", function(e){ var r = e.reason; errs.push("Promesa: " + (r && (r.message || r.code) || r)); if(!window.__appOk) caja(); });
+  setTimeout(function(){ if(!window.__appOk){ if(!errs.length) errs.push("La app tardó demasiado en arrancar (sin error visible)."); caja(); } }, 12000);
+})();
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore, collection, addDoc, doc, getDoc, getDocFromServer, updateDoc, setDoc, increment, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -923,6 +939,7 @@ if("serviceWorker" in navigator && !E) navigator.serviceWorker.register("sw.js")
 loadMine(); mine.forEach(m=>track(m.id));
 autoOpen = mine[0]?.id || null;
 
+window.__appOk = true;
 </script>
 <script>
 /* Auto-actualización: si en GitHub hay una versión nueva, la página se recarga sola (sin interrumpir un pedido en curso) */

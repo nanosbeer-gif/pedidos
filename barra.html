@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="75">
+<meta name="app-ver" content="76">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -165,6 +165,11 @@ body.bt .top h1,body.bt .top img,body.bt #outBtn{display:none}
 .asgm{all:unset;cursor:pointer;font-size:13px;font-weight:700;padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .asgm[aria-pressed="true"]{background:var(--neon);color:#1a0b3a;border-color:var(--neon)}
 .asgbts{display:grid;gap:6px}
+.bebch h3{margin:0 0 4px}.bebg{margin-top:10px}
+.bebgh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:13.5px}
+.bebchips{display:flex;flex-wrap:wrap;gap:6px}
+.bebc{all:unset;cursor:pointer;font-size:14px;font-weight:700;padding:8px 11px;border-radius:999px;border:1.5px solid var(--line);color:var(--fg)}
+.bebc.on{background:var(--neon);border-color:var(--neon);color:#1a0b3a}
 .tph{font-size:15px;margin:16px 0 6px}.tph small{color:var(--muted);font-weight:600}
 .tpl{display:grid;gap:6px}
 .tpr{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;flex-wrap:wrap}
@@ -826,13 +831,30 @@ const servicioBtn = e => e.abierto===false
 // Se guarda en el evento: barts:{id:{n:nombre, est:[estaciones], pausa, b:barra, ult}}, asig:{pedidoId:bartenderId}, modoAsig
 const FAM = {lic:{e:"🍹",n:"Licuadora"}, cer:{e:"🍺",n:"Cerveza"}, vas:{e:"🥤",n:"Vaso armado"}};
 const MODO_TXT = {
-  inteligente: "Junta bebidas del mismo tipo en el mismo bartender (hasta 3), para que las haga en tanda. Si nadie las tiene, se la da al menos ocupado.",
+  inteligente: "Si un bartender ya está haciendo esa misma bebida, le manda otra igual (hasta 3) para que las haga juntas. Si nadie la tiene, se la da al menos ocupado.",
   parejo: "Reparte parejo: cada bebida se va al bartender que tenga menos en ese momento, sin importar el tipo.",
-  estacion: "Cada bartender recibe solo lo de su estación (licuadora, cerveza o vaso armado), según lo que marcó al entrar.",
+  estacion: "Cada bartender recibe solo las bebidas que tiene en su lista (ej. derecha: frutos rojos, Barbie, Pitufo). Las que nadie eligió van al menos ocupado. Edita la lista con el botón Bebidas.",
   manual: "Tú decides: en cada pedido nuevo te salen botones con el nombre de cada bartender y cuántas lleva."
 };
-const MODOS = [["inteligente","🧠 Inteligente"],["parejo","⚖️ Parejo"],["estacion","🏪 Estación"],["manual","✋ Manual"]];
+const MODOS = [["inteligente","🧠 Inteligente"],["parejo","⚖️ Parejo"],["estacion","📋 Por bebida"],["manual","✋ Manual"]];
 let famCache = null;
+// Cada bebida del menú se identifica por marca + nombre (ej. "fizz|pina colada")
+const bebKey = it => (it && it.marca || "") + "|" + normB(it && it.nombre);
+const pedKey = p => bebKey((p.items||[])[0]);
+function bebidasEvento(e){ // bebidas que se venden en este evento, agrupadas por marca y categoría
+  const ms = evMarcas(e), out = [];
+  ms.forEach(m=>NFM.CATS.filter(c=>c.marca===m).forEach(c=>{ const its = NFM.ITEMS.filter(i=>i.cat===c.id && (i.marca===m || c.todas));
+    if(its.length) out.push({m, cat:c.name, its: its.map(i=>({k: i.marca+"|"+normB(i.name), n: i.name}))}); }));
+  return out;
+}
+let bebEdit = null; // {bid, sel:Set} mientras se edita la lista de bebidas de un bartender
+function bebChooser(e, titulo){
+  const gr = bebidasEvento(e), sel_ = bebEdit.sel;
+  return `<div class="bebch"><h3>${titulo}</h3><p class="hint">Toca las bebidas que prepara. En modo <b>Por bebida</b> solo le llegan esas. Si no eliges ninguna, recibe las que nadie tenga.</p>
+    ${gr.map(g=>`<div class="bebg"><div class="bebgh"><b>${esc(NFM.MARCAS[g.m].name)} · ${esc(g.cat)}</b><button class="mini" data-bebcat="${esc(g.its.map(x=>x.k).join(","))}">${g.its.every(x=>sel_.has(x.k))?"Quitar todas":"Todas"}</button></div>
+      <div class="bebchips">${g.its.map(x=>`<button class="bebc${sel_.has(x.k)?" on":""}" data-bebk="${esc(x.k)}">${sel_.has(x.k)?"✓ ":""}${esc(x.n)}</button>`).join("")}</div></div>`).join("")}
+    <div class="evb" style="margin-top:10px"><button class="btlista" data-bebsave style="margin:0">Guardar (${sel_.size})</button><button class="sec" data-bebcancel>Cancelar</button></div></div>`;
+}
 function famIt(it){
   if(!famCache){ famCache = {}; NFM.ITEMS.forEach(i=>{ const n = normB(i.name);
     const f = /frapp|matcha|pina colada|mangonada|^ice$|smoothie|taro|licuad|bubble|tapioca|malteada|chamoyada/.test(n) ? "lic" : (i.marca==="beer" || i.cat==="nb_cerv") ? "cer" : "vas";
@@ -845,17 +867,20 @@ const bartsDe = e => Object.entries((e && e.barts) || {}).map(([id,v])=>({id, ..
 const bartsBarra = (e, barra) => bartsDe(e).filter(b=>!b.b || !barra || b.b===barra);
 const asigDe = (e, pid) => { const id = e && e.asig && e.asig[pid]; return id && e.barts && e.barts[id] ? id : null; };
 function cargas(e, barra){ // bebidas en preparación de cada bartender, total y por estación
-  const out = {}; bartsBarra(e, barra).forEach(b=>out[b.id] = {tot:0, lic:0, cer:0, vas:0});
-  pedidos.filter(p=>p.estado==="preparando").forEach(p=>{ const id = asigDe(e, p.id); if(id && out[id]){ out[id].tot++; out[id][famPed(p)]++; } });
+  const out = {}; bartsBarra(e, barra).forEach(b=>out[b.id] = {tot:0, lic:0, cer:0, vas:0, k:{}});
+  pedidos.filter(p=>p.estado==="preparando").forEach(p=>{ const id = asigDe(e, p.id); if(id && out[id]){ out[id].tot++; out[id][famPed(p)]++; const k = pedKey(p); out[id].k[k] = (out[id].k[k]||0) + 1; } });
   return out;
 }
 function elegirBart(e, p){
   const modo = e.modoAsig || "inteligente"; if(modo==="manual") return null;
   const f = famPed(p), act = bartsBarra(e, p.barra).filter(b=>!b.pausa); if(!act.length) return null;
   const c = cargas(e, p.barra), menos = l => l.slice().sort((a,b)=>c[a.id].tot - c[b.id].tot || (a.ult||0) - (b.ult||0))[0];
-  if(modo==="estacion"){ const est = act.filter(b=>(b.est||[]).includes(f)); return menos(est.length ? est : act).id; }
-  if(modo==="inteligente"){ const mismo = act.filter(b=>c[b.id][f]>0 && c[b.id][f]<3); // ya está haciendo de ese tipo y no va cargado
-    if(mismo.length) return mismo.sort((a,b)=>c[b.id][f] - c[a.id][f] || c[a.id].tot - c[b.id].tot)[0].id; }
+  const k = pedKey(p);
+  if(modo==="estacion"){ // por bebida: a quien la tenga en su lista; si nadie, a los que no eligieron nada; si tampoco, al menos ocupado
+    const suyos = act.filter(b=>(b.beb||[]).includes(k)), libres = act.filter(b=>!(b.beb||[]).length);
+    return menos(suyos.length ? suyos : libres.length ? libres : act).id; }
+  if(modo==="inteligente"){ const mismo = act.filter(b=>(c[b.id].k[k]||0)>0 && c[b.id].k[k]<3); // ya está haciendo esa misma bebida
+    if(mismo.length) return mismo.sort((a,b)=>c[b.id].k[k] - c[a.id].k[k] || c[a.id].tot - c[b.id].tot)[0].id; }
   return menos(act).id;
 }
 async function asignar(e, pid, bid){
@@ -874,10 +899,12 @@ function asigBar(e){ // barrita del encargado: modo + carga de cada bartender
   const bs = bartsBarra(e, sel.barra), modo = e.modoAsig || "inteligente";
   if(!bs.length) return `<p class="hint asghint">🍹 Cuando cada bartender entre a su vista y ponga su nombre, aquí verás cuántas bebidas lleva y la app se las repartirá sola.</p>`;
   const c = cargas(e, sel.barra);
+  if(bebEdit && e.barts[bebEdit.bid] && sel.view==="cola") return `<div class="asgbar">${bebChooser(e, "Bebidas de " + esc(e.barts[bebEdit.bid].n))}</div>`;
   return `<div class="asgbar"><div class="asgmodos">${MODOS.map(([k,n])=>`<button class="asgm" data-modo="${k}" aria-pressed="${modo===k}">${n}</button>`).join("")}</div>
     <p class="asgdesc">${MODO_TXT[modo]}</p>
     <div class="asgbts">${bs.map(b=>`<div class="asgb${b.pausa?" pausa":""}"><b>${esc(b.n)}</b>
-      <span>${b.pausa ? "⏸ en pausa" : `<i>Licuadora ${c[b.id].lic}</i> <i>Cerveza ${c[b.id].cer}</i> <i>Vaso ${c[b.id].vas}</i>`}</span>
+      <span>${b.pausa ? "⏸ en pausa" : `<i>Preparando ${c[b.id].tot}</i>${(b.beb||[]).length?` <i>${b.beb.length} bebidas en su lista</i>`:` <i>Todas</i>`}`}</span>
+      <button class="mini" data-bebedit="${b.id}">Bebidas</button>
       <button class="mini" data-bpausa="${b.id}">${b.pausa?"▶️ Activar":"⏸ Pausa"}</button>
       <button class="mini" data-bquita="${b.id}">${quitarBid===b.id?"¿Quitar? Toca otra vez":"✕"}</button></div>`).join("")}</div></div>`;
 }
@@ -898,9 +925,8 @@ function bartRegistro(e){
   return `<div class="bthead"><div><b>🍹 Bartender</b><small>${esc(e?.nombre||"")}</small></div><button class="sec" data-encargado>Cambiar a Encargado</button></div>
     <div class="btreg"><h3>¿Quién eres?</h3><p class="hint">Escribe tu nombre para que la app te mande tus bebidas.</p>
       <input id="bname" maxlength="20" placeholder="Tu nombre" value="${esc(nombre)}" autocomplete="off">
-      <p class="hint" style="margin-top:12px">¿Qué estación tienes de tu lado? <small>(solo cuenta en modo Estación)</small></p>
-      <div class="btest">${Object.entries(FAM).map(([k,f])=>`<label><input type="checkbox" name="best" id="best_${k}" value="${k}"> ${f.e} ${f.n}</label>`).join("")}</div>
-      <button class="btlista" data-bregistro>Entrar</button></div>`;
+      <button class="btlista" data-bregistro>Entrar</button>
+      <p class="hint" style="margin-top:10px">Después de entrar puedes elegir <b>qué bebidas preparas</b> con el botón <b>Mis bebidas</b>.</p></div>`;
 }
 // ===== Vista Bartender: solo lo que está en Preparar, número gigante y un botón ¡Lista! (como la pantalla de cocina de comida rápida) =====
 const PREP_TARDE = 10; // minutos de espera del cliente para considerar una bebida atrasada (cuadro Prep. en rojo)
@@ -912,13 +938,14 @@ function bartView(){
   const e = ev(sel.evento);
   if(e && !(e.barts && e.barts[MY_BID])) return bartRegistro(e);
   const yo = e && e.barts[MY_BID];
+  if(bebEdit && bebEdit.bid===MY_BID) return bebChooser(e, "¿Qué bebidas preparas, " + esc(yo.n) + "?");
   const mine = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
   const prep = misBebidas(e, mine);
   const otros = e ? bartsBarra(e, sel.barra).filter(b=>b.id!==MY_BID) : [], c = e ? cargas(e, sel.barra) : {};
   const nuevos = mine.filter(p=>p.estado==="nuevo"), viejo = nuevos.length ? Math.max(...nuevos.map(minDe)) : 0;
   const alerta = nuevos.length && viejo >= ESPERA_MIN;
   return `<div class="bthead"><div><b>🍹 ${esc(yo?.n||"Bartender")}</b><small>${esc(e?.nombre||"")}${sel.barra?" · "+bName(e,sel.barra):""}</small></div>
-      <div class="btacts"><button class="sec${yo?.pausa?" pausaon":""}" data-mipausa>${yo?.pausa?"▶️ Volver":"⏸ Pausa"}</button><button class="sec" data-encargado>Encargado</button></div></div>
+      <div class="btacts"><button class="sec${yo?.pausa?" pausaon":""}" data-mipausa>${yo?.pausa?"▶️ Volver":"⏸ Pausa"}</button><button class="sec" data-bebedit="${MY_BID}">Mis bebidas</button><button class="sec" data-encargado>Encargado</button></div></div>
     ${yo?.pausa?`<div class="btwait rojo" style="animation:none">⏸ Estás en pausa: no te llegan bebidas nuevas.</div>`:""}
     ${otros.length?`<p class="btotros">${otros.map(b=>`${esc(b.n)}: ${b.pausa?"⏸":`<b>${c[b.id].tot}</b>`}`).join(" · ")}</p>`:""}
     <div class="btwait${alerta?" rojo":""}">${nuevos.length ? `🕐 <b>${nuevos.length}</b> pedido${nuevos.length===1?"":"s"} nuevo${nuevos.length===1?"":"s"} esperando vaso · el más viejo hace ${viejo} min${alerta?"<br><b>¡El encargado se está atorando, échale la mano!</b>":""}` : "✅ Sin pedidos nuevos esperando"}</div>
@@ -1150,8 +1177,6 @@ function tiemposHTML(e){
     <div class="tpl">${rapidos.length ? rapidos.map((b,i)=>`<div class="tpr"><span class="tpn">${MEDALLA[i]||(i+1)+"."} ${esc(b.k)}</span><span class="tpbar"><i style="width:${Math.round(b.avg/maxAvg*100)}%"></i></span><b>${fmtT(b.avg)}</b><small>mejor ${fmtT(b.min)}</small></div>`).join("") : `<p class="hint">Todavía nadie lleva 3 bebidas medidas.</p>`}</div>
     <h3 class="tph">🍹 Bebidas preparadas por bartender</h3>
     <div class="tpl">${masBeb.length ? masBeb.map(([n,c],i)=>`<div class="tpr"><span class="tpn">${MEDALLA[i]||(i+1)+"."} ${esc(n)}</span><span class="tpbar cnt"><i style="width:${Math.round(c/maxBeb*100)}%"></i></span><b>${c}</b><small>bebidas</small></div>`).join("") : `<p class="hint">Sin bartenders registrados.</p>`}</div>
-    <h3 class="tph">Por estación</h3>
-    <div class="tpl">${st.est.sort((a,b)=>b.n-a.n).map(x=>`<div class="tpr"><span class="tpn">${FAM[x.k]?FAM[x.k].n:x.k}</span><b>${fmtT(x.avg)}</b><small>${x.n} bebidas</small></div>`).join("")}</div>
     <h3 class="tph">Por bebida</h3>
     <div class="tpl">${st.beb.sort((a,b)=>b.n-a.n).map(x=>`<div class="tpr"><span class="tpn">${esc(x.k)}</span><b>${fmtT(x.avg)}</b><small>${x.n} ${x.n===1?"bebida":"bebidas"}</small></div>`).join("")}</div>`;
 }
@@ -1605,10 +1630,18 @@ document.addEventListener("click", async e=>{
   else if(t.dataset.bregistro!==undefined){ const e = ev(sel.evento), n = ($("#bname").value||"").trim();
     if(!e) return; if(!n){ $("#bname").focus(); $("#bname").placeholder = "Escribe tu nombre"; return; }
     try{ localStorage.setItem("nb_bname", n); }catch{}
-    const est = [...document.querySelectorAll('input[name="best"]:checked')].map(x=>x.value);
-    const yo = {n, est, pausa:false, b: sel.barra||0, ult: 0};
+    const yo = {n, beb: [], pausa:false, b: sel.barra||0, ult: 0};
     e.barts = {...(e.barts||{}), [MY_BID]: yo}; knownPrep = null; render();
     updateDoc(doc(db,"eventos",e.id), {["barts."+MY_BID]: yo}).catch(()=>alert("No se pudo guardar. Revisa el internet.")); }
+  else if(t.dataset.bebedit){ const e = ev(sel.evento), b = e && e.barts && e.barts[t.dataset.bebedit]; if(!b) return;
+    bebEdit = {bid: t.dataset.bebedit, sel: new Set(b.beb||[])}; render(); scrollTo(0,0); }
+  else if(t.dataset.bebk){ if(!bebEdit) return; const k = t.dataset.bebk; bebEdit.sel.has(k) ? bebEdit.sel.delete(k) : bebEdit.sel.add(k); render(); }
+  else if(t.dataset.bebcat){ if(!bebEdit) return; const ks = t.dataset.bebcat.split(","), todas = ks.every(k=>bebEdit.sel.has(k));
+    ks.forEach(k=>todas ? bebEdit.sel.delete(k) : bebEdit.sel.add(k)); render(); }
+  else if(t.dataset.bebcancel!==undefined){ bebEdit = null; render(); }
+  else if(t.dataset.bebsave!==undefined){ const e = ev(sel.evento); if(!bebEdit || !e || !e.barts || !e.barts[bebEdit.bid]) return;
+    const id = bebEdit.bid, lista = [...bebEdit.sel]; e.barts[id] = {...e.barts[id], beb: lista}; bebEdit = null; render();
+    updateDoc(doc(db,"eventos",e.id), {["barts."+id+".beb"]: lista}).catch(()=>alert("No se pudo guardar. Revisa el internet.")); }
   else if(t.dataset.mipausa!==undefined){ const e = ev(sel.evento); if(!e || !e.barts || !e.barts[MY_BID]) return;
     const v = !e.barts[MY_BID].pausa; e.barts[MY_BID] = {...e.barts[MY_BID], pausa:v}; render();
     updateDoc(doc(db,"eventos",e.id), {["barts."+MY_BID+".pausa"]: v}).catch(()=>{}); }
