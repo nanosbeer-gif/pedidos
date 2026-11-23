@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="76">
+<meta name="app-ver" content="77">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -133,7 +133,7 @@ body.tv .top{display:none}
 .compbtn{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;margin-top:8px;background:var(--panel2);border-radius:10px;padding:6px;font-weight:800}
 .compbtn img{width:44px;height:56px;object-fit:cover;border-radius:6px}
 .nocomp{color:var(--gold);font-weight:800;margin-top:6px}
-.modal{position:fixed;inset:0;background:#000d;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px}
+.modal{position:fixed;top:0;right:0;bottom:0;left:0;background:#000d;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px}
 .modal img{max-width:100%;max-height:80vh;border-radius:12px}
 .sec.on{border-color:var(--neon);color:var(--neon)}
 .mlist{display:grid;gap:8px}
@@ -1277,7 +1277,7 @@ function manOpen(){
   const e = ev(sel.evento); if(!e) return;
   man = {e, item: ""};
   let o = document.getElementById("manOv");
-  if(!o){ o = document.createElement("div"); o.id = "manOv"; o.style.cssText = "position:fixed;inset:0;background:rgba(10,4,25,.82);z-index:9000;overflow:auto;padding:16px"; document.body.appendChild(o); }
+  if(!o){ o = document.createElement("div"); o.id = "manOv"; o.style.cssText = "position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(10,4,25,.82);z-index:9000;overflow:auto;padding:16px"; document.body.appendChild(o); }
   const its = manItems(e), cats = NFM.CATS;
   o.innerHTML = `<form id="manF" class="evf" style="max-width:520px;margin:0 auto">
     <b style="font-size:18px">➕ Pedido en barra</b>
