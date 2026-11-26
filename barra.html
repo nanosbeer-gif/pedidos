@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="77">
+<meta name="app-ver" content="78">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-barra.png">
 <link rel="apple-touch-icon" href="icon-barra.png">
@@ -212,6 +212,8 @@ body.bt .top h1,body.bt .top img,body.bt #outBtn{display:none}
 .btop span{font-weight:700;color:var(--muted);font-size:14px}
 .btnota{font-size:17px;font-weight:800}
 .btempty{text-align:center;color:var(--muted);font-size:20px;margin-top:40px}
+.gracbtn{display:block;width:100%;box-sizing:border-box;margin:0 0 10px;padding:11px;border-radius:14px;font:inherit;font-weight:800;font-size:14.5px;cursor:pointer;text-align:center;border:2px solid #b14cff;background:#2a1240;color:#e9c8ff}
+.gracbtn small{display:block;font-size:12px;font-weight:600;opacity:.85;margin-top:2px}
 .svc{display:block;width:100%;margin:0 0 10px;padding:12px;border-radius:14px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;text-align:center;border:2px solid}
 .svc b{display:block;font-size:13px;margin-top:3px;opacity:.9}
 .svc.off{background:#3a0d12;border-color:#e01b1b;color:#ffb3b3}
@@ -959,6 +961,11 @@ function bartView(){
       <button class="btlista" data-id="${p.id}" data-to="lista">✅ ¡Lista!</button></article>`; }).join("")}</div>`
       : `<p class="btempty">🙌 Nada por preparar.<br><small>Aquí aparecen las bebidas en cuanto el encargado las pase a Preparar.</small></p>`}`;
 }
+// Agradecimiento + propina para los invitados que ya pidieron (se manda a todos sus celulares)
+let graciasOk = false;
+const graciasBtn = e => `<button class="gracbtn" data-gracias="${e.id}">${graciasOk ? "¿Seguro? Toca otra vez para ENVIAR 💜" : e.gracias
+  ? `💜 Agradecimiento enviado a las ${new Date(e.gracias).toLocaleTimeString("es-MX",{hour:"numeric",minute:"2-digit"})}<small>Toca para enviarlo otra vez</small>`
+  : `💜 Enviar agradecimiento y propina<small>Les llega a los invitados que ya pidieron. Pregunta antes al anfitrión.</small>`}</button>`;
 function colaView(){
   const e = ev(sel.evento), titulo = sel.evento==="domicilio" ? "Domicilio" : (e?.nombre||"Evento");
   const list0 = pedidos.filter(p=>!sel.barra || p.barra===sel.barra);
@@ -973,6 +980,7 @@ function colaView(){
     ${sel.evento==="domicilio"?`<button class="sec" data-ventas style="width:100%;margin:0 0 10px">📋 Copiar ventas para el HTML de ventas <small style="opacity:.75">(${RANGOS.find(r=>r[0]===domRango)?.[1]||""})</small></button>`:""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? `<button class="sec bvbtn" data-bart>🍹 Cambiar a vista Bartender</button>` : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? servicioBtn(e) : ""}
+    ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? graciasBtn(e) : ""}
     ${sel.evento!=="domicilio" ? invBanner(e) : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado" ? asigBar(e) : ""}
     ${sel.evento!=="domicilio" && e && e.estado!=="cerrado"?`<a class="sec" href="index.html?e=${encodeURIComponent(sel.evento)}&b=${sel.barra||1}&staff=1" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none;width:100%;box-sizing:border-box;margin:0 0 10px;font-weight:800">➕ Pedido en barra (invitado sin celular) · abre el menú</a>`:""}
@@ -1661,6 +1669,10 @@ document.addEventListener("click", async e=>{
     navigator.clipboard.writeText(txt).then(()=>{ t.textContent = "✅ ¡Copiado! Pégalo en WhatsApp"; setTimeout(()=>{ if(t.isConnected) t.textContent = "📋 Copiar link e invitación"; }, 3000); })
       .catch(()=>prompt("Copia este texto:", txt)); }
   else if(t.dataset.lnkwa){ const e = ev(sel.evento); window.open("https://wa.me/?text="+encodeURIComponent(invitacion(e, +t.dataset.lnkwa)), "_blank"); }
+  else if(t.dataset.gracias){ const e = ev(t.dataset.gracias); if(!e) return;
+    if(!graciasOk){ graciasOk = true; render(); setTimeout(()=>{ if(graciasOk){ graciasOk = false; render(); } }, 4000); return; }
+    graciasOk = false; e.gracias = Date.now(); render();
+    updateDoc(doc(db,"eventos",e.id), {gracias: e.gracias}).catch(()=>alert("No se pudo enviar. Revisa el internet.")); }
   else if(t.dataset.servicio){ const e = ev(t.dataset.servicio), ab = t.dataset.v==="1";
     if(!ab && !t.dataset.ok){ t.dataset.ok = "1"; t.querySelector("b").textContent = "¿Seguro? Toca otra vez para CERRAR"; setTimeout(()=>{ delete t.dataset.ok; if(t.isConnected) render(); }, 4000); return; }
     if(e) e.abierto = ab; render();

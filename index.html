@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-ver" content="69">
+<meta name="app-ver" content="70">
 <meta name="theme-color" content="#140a2e">
 <link rel="icon" type="image/png" href="icon-fizz.png">
 <link rel="apple-touch-icon" href="icon-fizz.png">
@@ -80,6 +80,8 @@ textarea.t{min-height:60px;resize:vertical}
 .row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
 .row div{min-width:0}
 .row small{color:var(--muted);display:block}
+.gopts{display:grid;gap:8px;margin-top:12px}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;width:100%;padding:13px 14px;border-radius:14px;border:1.5px solid var(--line);background:transparent;color:var(--fg,#fff);font:inherit;font-weight:800;font-size:15px;text-decoration:none;cursor:pointer}
 .rm{all:unset;cursor:pointer;color:var(--pink);font-size:12.5px;font-weight:700}
 .total{display:flex;justify-content:space-between;font-family:var(--display);font-size:22px;margin:12px 0 4px}
 .total span:last-child{color:var(--neon);font-variant-numeric:tabular-nums}
@@ -432,7 +434,7 @@ async function loadEvento(){
   eventoOk = !!(evento && evento.estado==="activo");
   setModeUI(); renderBrand(); renderChips(); renderMenu(); renderMine();
   // En vivo: si la barra abre o cierra el servicio, se actualiza sin recargar
-  onSnapshot(doc(db,"eventos",E), snap=>{ if(!snap.exists()) return; const antes = servicioCerrado(); evento = {id:snap.id, ...snap.data()}; eventoOk = evento.estado==="activo"; setModeUI(); if(antes && !servicioCerrado()) abiertoSheet(); }, ()=>{});
+  onSnapshot(doc(db,"eventos",E), snap=>{ if(!snap.exists()) return; const antes = servicioCerrado(); evento = {id:snap.id, ...snap.data()}; eventoOk = evento.estado==="activo"; setModeUI(); if(antes && !servicioCerrado()) abiertoSheet(); else checkGracias(); }, ()=>{});
 }
 // Barra todavía cerrada: pueden ver el menú, pero no pedir (el modo barra/staff sí puede)
 function servicioCerrado(){ return mode==="evento" && !!evento && evento.abierto===false && !STAFF; }
@@ -783,7 +785,28 @@ function track(id){
   }, ()=>{ delete watchers[id]; if(viewing===id) $("#status").innerHTML = `<div class="st"><p class="err">Se perdió la conexión. Revisa tu señal y vuelve a abrir la página.</p><button class="ghost" id="backBtn">Volver al menú</button></div>`; });
 }
 
-function renderMine(){ setTimeout(renderWA, 0);
+// ===== Agradecimiento + propina: lo manda el encargado desde el panel (campo "gracias" del evento) =====
+const yaPidio = () => mine.some(m=>{ const p = data[m.id]; return p && p.evento===E; });
+let graciasPend = false;
+function checkGracias(){
+  if(!E || STAFF || !evento || !evento.gracias) return;
+  const k = "nf_gracias_"+E; let visto = 0; try{ visto = +localStorage.getItem(k) || 0; }catch{}
+  if(evento.gracias <= visto || Date.now() - evento.gracias > 3*3600e3 || !yaPidio()) return; // ya lo vio, es viejo o no ha pedido nada
+  if(!$("#sheetBg").hidden || cart.length){ // está ocupado pidiendo: esperar
+    if(!graciasPend){ graciasPend = true; setTimeout(()=>{ graciasPend = false; checkGracias(); }, 5000); } return; }
+  try{ localStorage.setItem(k, String(evento.gracias)); }catch{}
+  graciasSheet(false);
+}
+function graciasSheet(conClabe){
+  openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>¡Gracias por acompañarnos! 🍹</h3>
+    <p class="desc" style="font-size:15px;margin-top:8px">Esperamos que estés disfrutando tus bebidas. Si te está gustando nuestro servicio, puedes apoyar a nuestro equipo de bartenders con una propina. ¡Cualquier cantidad se agradece de corazón! 💜</p>
+    ${conClabe ? `<div class="aviso" style="margin-top:12px"><b>Propina por transferencia</b>${esc(TRANSFER.banco)} · ${esc(TRANSFER.titular)}<br>CLABE: <span style="user-select:all;font-weight:800">${esc(TRANSFER.clabe)}</span> <button class="rm" data-copy="${esc(TRANSFER.clabe)}" style="margin-left:6px">Copiar</button><small>En el concepto pon "Propina". ¡Mil gracias! 💜</small></div>`
+      : `<div class="gopts"><button class="primary" data-gprop>💳 Dejar propina por transferencia</button><button class="gbtn" data-gbarra>🫙 La dejo en la barra</button></div>`}
+    <div class="gopts"><a class="gbtn" href="https://instagram.com/nanos.beer" target="_blank" rel="noopener">📸 Síguenos en Instagram</a>
+      <button class="wabtn" data-wa>${WA_ICON}<span>¿Nano's en tu evento? Contrátanos</span></button>
+      <button class="rm" data-close style="justify-self:center;margin-top:4px">Ahora no</button></div>`);
+}
+function renderMine(){ setTimeout(renderWA, 0); setTimeout(checkGracias, 300);
   const list = mine.map(m=>data[m.id]).filter(p=>p && (E ? p.evento===E : p.modo==="domicilio"));
   const box = $("#mine");
   if(!list.length){ box.hidden = true; return; }
@@ -892,6 +915,8 @@ document.addEventListener("click", e=>{
   if(e.target.id==="sheetBg"){ closeSheet(); return; }
   const t = e.target.closest("button"); if(!t) return;
   if(t.dataset.wa!==undefined){ openWA(); return; }
+  if(t.dataset.gprop!==undefined){ graciasSheet(true); return; }
+  if(t.dataset.gbarra!==undefined){ openSheet(`<button class="close" data-close>Cerrar ✕</button><h3>¡Muchas gracias! 💜</h3><p class="desc" style="font-size:15px;margin-top:8px">La alcancía está en la barra. Tu apoyo motiva muchísimo a nuestro equipo. ¡Que sigas disfrutando la fiesta! 🎉</p><div style="margin-top:16px"><button class="primary" data-close>Seguir en la fiesta</button></div>`); return; }
   if(t.dataset.marca) setMarca(t.dataset.marca);
   else if(t.dataset.mayor){ store.set("nf_18","1"); closeSheet(); setMarca(t.dataset.mayor); }
   else if(t.dataset.mine) showStatus(t.dataset.mine);
